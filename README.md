@@ -62,6 +62,64 @@ README.md             # This file
 - By default, the backend uses SQLite for convenience. To switch to MySQL, set `DATABASE_URL` to a valid MySQL connection string before starting the server.
 - Tables are created automatically on app start. For production usage, consider managing migrations separately.
 
+### Schema overview
+
+The application persists three core entities. Column types reflect their SQLAlchemy definitions and are compatible with MySQL and SQLite alike.
+
+| Table | Columns |
+| --- | --- |
+| `users` | `id` (PK, INT, auto increment), `email` (VARCHAR(120), unique, not null), `name` (VARCHAR(120), not null), `password_hash` (VARCHAR(255), not null), `created_at` (DATETIME, default current timestamp) |
+| `chart_groups` | `id` (PK, INT, auto increment), `name` (VARCHAR(120), not null), `user_id` (FK → `users.id`, not null), `created_at` (DATETIME, default current timestamp) |
+| `chart_tasks` | `id` (PK, INT, auto increment), `title` (VARCHAR(255), not null), `status` (VARCHAR(50), default `'pending'`), `user_id` (FK → `users.id`, not null), `group_id` (FK → `chart_groups.id`, nullable), `image_path` (VARCHAR(500)), `summary` (TEXT), `description` (TEXT), `data_points` (JSON), `table_data` (JSON), `generated_code` (LONGTEXT/TEXT), `custom_code` (LONGTEXT/TEXT), `error_message` (TEXT), `created_at` (DATETIME, default current timestamp), `updated_at` (DATETIME, default current timestamp, auto-update on change) |
+
+### SQL definition
+
+For environments that require manual bootstrap, run the following SQL script (MySQL syntax) to create all tables. Adjust data types if your target database lacks JSON support.
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(120) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS chart_groups (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  user_id INT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_chart_groups_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS chart_tasks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  user_id INT NOT NULL,
+  group_id INT NULL,
+  image_path VARCHAR(500) NULL,
+  summary TEXT NULL,
+  description TEXT NULL,
+  data_points JSON NULL,
+  table_data JSON NULL,
+  generated_code LONGTEXT NULL,
+  custom_code LONGTEXT NULL,
+  error_message TEXT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_chart_tasks_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_chart_tasks_group
+    FOREIGN KEY (group_id) REFERENCES chart_groups(id)
+    ON DELETE SET NULL
+);
+```
+
 ## Simulated chart processing
 
 The current implementation includes a simulated cloud processing pipeline (`backend/utils/chart_processing.py`). It opens the uploaded image, generates pseudo-random data points, and creates an accessible HTML code snippet. Replace the simulation with your actual cloud-based pipeline by updating the `process_chart` function.
