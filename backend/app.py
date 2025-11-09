@@ -11,10 +11,11 @@ from .config import get_config
 from .extensions import db, jwt
 from .tasks import worker
 
-
+from dotenv import load_dotenv
 def create_app(config_name: str | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(get_config(config_name))
+    load_dotenv()
 
     upload_dir = Path(app.config["UPLOAD_FOLDER"])
     upload_dir.mkdir(parents=True, exist_ok=True)
