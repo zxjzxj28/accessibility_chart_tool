@@ -1,31 +1,31 @@
 <template>
   <div class="dashboard">
     <aside class="sidebar">
-      <div class="logo">ACT Studio</div>
+      <div class="logo">ACT 工作室</div>
       <div class="user-card">
         <h3>{{ auth.user?.name }}</h3>
         <p>{{ auth.user?.email }}</p>
         <button class="secondary" @click="showPassword = !showPassword">
-          <span v-if="showPassword">Close password panel</span>
-          <span v-else>Change password</span>
+          <span v-if="showPassword">收起修改密码</span>
+          <span v-else>修改密码</span>
         </button>
         <transition name="fade">
           <form v-if="showPassword" class="password-form" @submit.prevent="updatePassword">
-            <input v-model="passwordForm.current_password" type="password" placeholder="Current password" required />
-            <input v-model="passwordForm.new_password" type="password" placeholder="New password" required />
+            <input v-model="passwordForm.current_password" type="password" placeholder="当前密码" required />
+            <input v-model="passwordForm.new_password" type="password" placeholder="新密码" required />
             <button type="submit" class="primary" :disabled="passwordLoading">
-              <span v-if="passwordLoading">Updating...</span>
-              <span v-else>Update password</span>
+              <span v-if="passwordLoading">正在更新...</span>
+              <span v-else>确认修改</span>
             </button>
             <p v-if="passwordMessage" class="password-message">{{ passwordMessage }}</p>
           </form>
         </transition>
-        <button class="ghost" @click="logout">Log out</button>
+        <button class="ghost" @click="logout">退出登录</button>
       </div>
       <div class="group-section">
         <div class="section-title">
-          <h4>Groups</h4>
-          <button class="icon" @click="refreshGroups" title="Refresh groups">⟳</button>
+          <h4>分组</h4>
+          <button class="icon" @click="refreshGroups" title="刷新分组">⟳</button>
         </div>
         <div class="group-list">
           <button
@@ -33,7 +33,7 @@
             :class="{ active: !selectedGroup }"
             @click="selectGroup(null)"
           >
-            All charts
+            全部图表
           </button>
           <button
             v-for="group in groups"
@@ -46,8 +46,8 @@
           </button>
         </div>
         <form class="group-form" @submit.prevent="createGroup">
-          <input v-model="newGroupName" type="text" placeholder="New group name" required />
-          <button type="submit" class="primary">Add</button>
+          <input v-model="newGroupName" type="text" placeholder="新分组名称" required />
+          <button type="submit" class="primary">添加</button>
         </form>
         <p v-if="groupMessage" class="info">{{ groupMessage }}</p>
       </div>
@@ -55,58 +55,58 @@
     <main class="content">
       <header class="content-header">
         <div>
-          <h1>Accessible chart workspace</h1>
-          <p>Upload charts, generate accessible code snippets, and manage your conversion tasks.</p>
+          <h1>无障碍图表工作台</h1>
+          <p>上传图表、生成无障碍代码片段，并集中管理所有转换任务。</p>
         </div>
-        <button class="primary" @click="refreshTasks">Refresh tasks</button>
+        <button class="primary" @click="refreshTasks">刷新任务</button>
       </header>
 
       <section class="upload-card">
-        <h2>Upload a new chart</h2>
-        <p>Supported formats: PNG, JPG. Maximum size 16MB.</p>
+        <h2>上传新的图表</h2>
+        <p>支持 PNG、JPG，文件大小不超过 16MB。</p>
         <form @submit.prevent="submitTask" class="upload-form">
           <div class="field-grid">
             <label>
-              Chart title
-              <input v-model="title" type="text" placeholder="Marketing funnel Q1" required />
+              图表标题
+              <input v-model="title" type="text" placeholder="示例：一季度营销漏斗" required />
             </label>
             <label>
-              Assign to group
+              指定分组
               <select v-model="selectedGroupForUpload">
-                <option :value="null">No group</option>
+                <option :value="null">不分组</option>
                 <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
               </select>
             </label>
           </div>
           <label class="file-input">
-            <span v-if="!file">Select chart image</span>
+            <span v-if="!file">选择图表图片</span>
             <span v-else>{{ file.name }}</span>
             <input type="file" accept="image/*" @change="handleFile" required />
           </label>
           <button type="submit" class="primary" :disabled="uploading">
-            <span v-if="uploading">Uploading...</span>
-            <span v-else>Start conversion</span>
+            <span v-if="uploading">正在上传...</span>
+            <span v-else>开始转换</span>
           </button>
         </form>
         <p v-if="uploadMessage" class="info">{{ uploadMessage }}</p>
       </section>
 
       <section class="task-section">
-        <h2>Recent tasks</h2>
+        <h2>最新任务</h2>
         <p v-if="taskMessage" class="info">{{ taskMessage }}</p>
         <div class="task-grid">
           <article v-for="task in tasks" :key="task.id" class="task-card">
-            <div class="status" :class="task.status">{{ task.status }}</div>
+            <div class="status" :class="task.status">{{ getStatusLabel(task.status) }}</div>
             <h3>{{ task.title }}</h3>
-            <p class="timestamp">Created {{ formatDate(task.created_at) }}</p>
+            <p class="timestamp">创建于 {{ formatDate(task.created_at) }}</p>
             <p v-if="task.summary" class="summary">{{ task.summary }}</p>
             <div class="actions">
-              <router-link :to="`/tasks/${task.id}`" class="primary">Open detail</router-link>
-              <button v-if="canCancel(task.status)" class="ghost" @click="cancelTask(task.id)">Cancel</button>
-              <button class="ghost danger" @click="deleteTask(task.id)">Delete</button>
+              <router-link :to="`/tasks/${task.id}`" class="primary">查看详情</router-link>
+              <button v-if="canCancel(task.status)" class="ghost" @click="cancelTask(task.id)">取消任务</button>
+              <button class="ghost danger" @click="deleteTask(task.id)">删除</button>
             </div>
           </article>
-          <div v-if="!tasks.length" class="empty">No tasks found. Upload a chart to get started.</div>
+          <div v-if="!tasks.length" class="empty">暂无任务，请上传图表开始体验。</div>
         </div>
       </section>
     </main>
@@ -138,6 +138,16 @@ const passwordLoading = ref(false);
 const passwordMessage = ref('');
 const passwordForm = reactive({ current_password: '', new_password: '' });
 
+const statusLabels = {
+  pending: '排队中',
+  processing: '处理中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+};
+
+const getStatusLabel = (status) => statusLabels[status] || status;
+
 const fetchTasks = async () => {
   const params = selectedGroup.value ? { group_id: selectedGroup.value } : {};
   const { data } = await axios.get('/api/tasks', { params });
@@ -154,7 +164,7 @@ const refreshTasks = async () => {
     await fetchTasks();
     taskMessage.value = '';
   } catch (err) {
-    taskMessage.value = err.response?.data?.message || 'Unable to fetch tasks.';
+    taskMessage.value = err.response?.data?.message || '无法获取任务列表。';
   }
 };
 
@@ -162,7 +172,7 @@ const refreshGroups = async () => {
   try {
     await fetchGroups();
   } catch (err) {
-    groupMessage.value = err.response?.data?.message || 'Unable to fetch groups.';
+    groupMessage.value = err.response?.data?.message || '无法获取分组列表。';
   }
 };
 
@@ -176,10 +186,10 @@ const createGroup = async () => {
   try {
     const { data } = await axios.post('/api/groups', { name: newGroupName.value });
     groups.value.unshift(data);
-    groupMessage.value = `Group "${data.name}" created.`;
+    groupMessage.value = `已创建分组「${data.name}」。`;
     newGroupName.value = '';
   } catch (err) {
-    groupMessage.value = err.response?.data?.message || 'Unable to create group.';
+    groupMessage.value = err.response?.data?.message || '无法创建分组。';
   }
 };
 
@@ -200,12 +210,12 @@ const submitTask = async () => {
       formData.append('group_id', selectedGroupForUpload.value);
     }
     await axios.post('/api/tasks', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-    uploadMessage.value = 'Task created. Processing will continue in the background.';
+    uploadMessage.value = '任务已创建，后台将继续处理。';
     title.value = '';
     file.value = null;
     await refreshTasks();
   } catch (err) {
-    uploadMessage.value = err.response?.data?.message || 'Unable to create task.';
+    uploadMessage.value = err.response?.data?.message || '无法创建任务。';
   } finally {
     uploading.value = false;
   }
@@ -214,20 +224,20 @@ const submitTask = async () => {
 const cancelTask = async (taskId) => {
   try {
     await axios.post(`/api/tasks/${taskId}/cancel`);
-    taskMessage.value = 'Task cancelled.';
+    taskMessage.value = '任务已取消。';
     await refreshTasks();
   } catch (err) {
-    taskMessage.value = err.response?.data?.message || 'Unable to cancel task.';
+    taskMessage.value = err.response?.data?.message || '无法取消任务。';
   }
 };
 
 const deleteTask = async (taskId) => {
   try {
     await axios.delete(`/api/tasks/${taskId}`);
-    taskMessage.value = 'Task deleted.';
+    taskMessage.value = '任务已删除。';
     await refreshTasks();
   } catch (err) {
-    taskMessage.value = err.response?.data?.message || 'Unable to delete task.';
+    taskMessage.value = err.response?.data?.message || '无法删除任务。';
   }
 };
 
@@ -245,11 +255,11 @@ const updatePassword = async () => {
   passwordMessage.value = '';
   try {
     await auth.changePassword(passwordForm);
-    passwordMessage.value = 'Password updated successfully.';
+    passwordMessage.value = '密码修改成功。';
     passwordForm.current_password = '';
     passwordForm.new_password = '';
   } catch (err) {
-    passwordMessage.value = err.response?.data?.message || 'Unable to update password.';
+    passwordMessage.value = err.response?.data?.message || '无法修改密码。';
   } finally {
     passwordLoading.value = false;
   }

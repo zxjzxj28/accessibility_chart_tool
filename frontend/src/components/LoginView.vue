@@ -1,25 +1,25 @@
 <template>
   <div class="auth-layout">
     <div class="panel">
-      <h1>Accessibility Chart Tool</h1>
-      <p class="subtitle">Log in to manage your accessible chart conversions.</p>
+      <h1>无障碍图表工具</h1>
+      <p class="subtitle">登录以管理你的无障碍图表转换任务。</p>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
-          Email
-          <input v-model="email" type="email" required placeholder="you@example.com" />
+          邮箱
+          <input v-model="email" type="email" required placeholder="请输入邮箱地址" />
         </label>
         <label>
-          Password
+          密码
           <input v-model="password" type="password" required placeholder="••••••••" />
         </label>
         <button type="submit" :disabled="loading">
-          <span v-if="loading">Signing in...</span>
-          <span v-else>Sign In</span>
+          <span v-if="loading">正在登录...</span>
+          <span v-else>登录</span>
         </button>
       </form>
       <p class="hint">
-        Don't have an account?
-        <router-link to="/register">Create one</router-link>
+        还没有账号？
+        <router-link to="/register">立即注册</router-link>
       </p>
       <p v-if="error" class="error">{{ error }}</p>
     </div>
@@ -48,7 +48,7 @@ const handleSubmit = async () => {
     const redirect = route.query.redirect || '/';
     router.push(redirect);
   } catch (err) {
-    error.value = err.response?.data?.message || 'Unable to log in.';
+    error.value = err.response?.data?.message || '无法完成登录。';
   } finally {
     loading.value = false;
   }

@@ -1,17 +1,17 @@
-# Accessibility Chart Tool
+# 无障碍图表工具
 
-A full-stack developer tool that converts chart images into accessible front-end components for Android web views. The platform lets users upload chart images, processes them asynchronously, and produces accessible code snippets alongside data summaries. Each user can organise their generated charts in groups, edit the generated code, preview the results, and manage task history.
+这是一个面向开发者的全栈工具，用于将图表图片转换为可直接在 Android Web 视图中集成的无障碍前端组件。平台支持用户上传图表图片，后台异步处理后生成包含数据摘要的无障碍代码片段。每位用户都可以将生成记录分组管理、编辑代码、预览效果并维护任务历史。
 
-## Features
+## 功能特性
 
-- User authentication with registration, login, logout, and password updates.
-- Task management: create (upload), list, cancel, delete, and view detailed results.
-- Asynchronous background worker that simulates cloud processing to extract summaries and data points.
-- Automatic generation of accessible chart container code with focusable data points for screen reader support.
-- Vue 3 front-end with task dashboard, chart grouping, code editor, and live preview sandbox.
-- MySQL-compatible database layer via SQLAlchemy (defaults to SQLite for local development).
+- 用户认证：注册、登录、退出登录以及修改密码。
+- 任务管理：创建（上传）、列表查看、取消、中止、删除以及查看详情。
+- 异步后台工作线程，用于模拟云端处理流程并提取图表摘要与数据点。
+- 自动生成可聚焦数据点的无障碍图表容器代码，以支持屏幕阅读器播报。
+- 基于 Vue 3 的前端界面，包含任务看板、图表分组、代码编辑器与实时预览沙箱。
+- 基于 SQLAlchemy 的 MySQL 兼容数据库层（本地开发默认使用 SQLite）。
 
-## Project structure
+## 项目结构
 
 ```
 backend/
@@ -27,54 +27,53 @@ frontend/
 README.md             # This file
 ```
 
-## Backend setup
+## 后端搭建
 
-1. Create a virtual environment and install dependencies:
+1. 创建虚拟环境并安装依赖：
    ```bash
    cd backend
    python -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
-2. Configure environment variables as needed (or edit the defaults in
-   `backend/config.py` if you prefer to hard-code local settings):
-   - `DATABASE_URL`: SQLAlchemy connection string (e.g. `mysql+pymysql://user:pass@localhost/chart_tool`).
-   - `SECRET_KEY`, `JWT_SECRET_KEY`: security secrets.
-   - `UPLOAD_FOLDER`: optional custom path for image uploads.
-3. Run the development server:
+2. 按需配置环境变量（或者直接修改 `backend/config.py` 中的默认值，以硬编码本地配置）：
+   - `DATABASE_URL`：SQLAlchemy 连接串（例如 `mysql+pymysql://user:pass@localhost/chart_tool`）。
+   - `SECRET_KEY`、`JWT_SECRET_KEY`：安全密钥。
+   - `UPLOAD_FOLDER`：可选项，自定义图片上传目录。
+3. 启动开发服务器：
    ```bash
    flask --app app:create_app run
    ```
-   The API will be available at `http://localhost:5000` and the background worker starts automatically.
+   API 将运行在 `http://localhost:5000`，后台工作线程会自动启动。
 
-## Frontend setup
+## 前端搭建
 
-1. Install dependencies and start the Vite dev server:
+1. 安装依赖并启动 Vite 开发服务器：
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
-2. The front-end proxies `/api` requests to `http://localhost:5000` via the Vite dev server configuration.
+2. 前端通过 Vite 配置将 `/api` 请求代理到 `http://localhost:5000`。
 
-## Database notes
+## 数据库说明
 
-- By default, the backend uses SQLite for convenience. To switch to MySQL, set `DATABASE_URL` to a valid MySQL connection string before starting the server.
-- Tables are created automatically on app start. For production usage, consider managing migrations separately.
+- 默认使用 SQLite 以方便开发，如需切换到 MySQL，请在启动服务前将 `DATABASE_URL` 设置为有效的 MySQL 连接串。
+- 应用启动时会自动创建数据表。生产环境建议结合迁移工具进行管理。
 
-### Schema overview
+### 表结构概览
 
-The application persists three core entities. Column types reflect their SQLAlchemy definitions and are compatible with MySQL and SQLite alike.
+系统持久化三个核心实体，下表列出的字段类型与 SQLAlchemy 定义一致，可同时兼容 MySQL 与 SQLite。
 
-| Table | Columns |
+| 表名 | 字段 |
 | --- | --- |
-| `users` | `id` (PK, INT, auto increment), `email` (VARCHAR(120), unique, not null), `name` (VARCHAR(120), not null), `password_hash` (VARCHAR(255), not null), `created_at` (DATETIME, default current timestamp) |
-| `chart_groups` | `id` (PK, INT, auto increment), `name` (VARCHAR(120), not null), `user_id` (FK → `users.id`, not null), `created_at` (DATETIME, default current timestamp) |
-| `chart_tasks` | `id` (PK, INT, auto increment), `title` (VARCHAR(255), not null), `status` (VARCHAR(50), default `'pending'`), `user_id` (FK → `users.id`, not null), `group_id` (FK → `chart_groups.id`, nullable), `image_path` (VARCHAR(500)), `summary` (TEXT), `description` (TEXT), `data_points` (JSON), `table_data` (JSON), `generated_code` (LONGTEXT/TEXT), `custom_code` (LONGTEXT/TEXT), `error_message` (TEXT), `created_at` (DATETIME, default current timestamp), `updated_at` (DATETIME, default current timestamp, auto-update on change) |
+| `users` | `id`（主键，INT，自增）、`email`（VARCHAR(120)，唯一，非空）、`name`（VARCHAR(120)，非空）、`password_hash`（VARCHAR(255)，非空）、`created_at`（DATETIME，默认当前时间） |
+| `chart_groups` | `id`（主键，INT，自增）、`name`（VARCHAR(120)，非空）、`user_id`（外键 → `users.id`，非空）、`created_at`（DATETIME，默认当前时间） |
+| `chart_tasks` | `id`（主键，INT，自增）、`title`（VARCHAR(255)，非空）、`status`（VARCHAR(50)，默认 `'pending'`）、`user_id`（外键 → `users.id`，非空）、`group_id`（外键 → `chart_groups.id`，可为空）、`image_path`（VARCHAR(500)）、`summary`（TEXT）、`description`（TEXT）、`data_points`（JSON）、`table_data`（JSON）、`generated_code`（LONGTEXT/TEXT）、`custom_code`（LONGTEXT/TEXT）、`error_message`（TEXT）、`created_at`（DATETIME，默认当前时间）、`updated_at`（DATETIME，默认当前时间并在更新时自动刷新） |
 
-### SQL definition
+### SQL 建表脚本
 
-For environments that require manual bootstrap, run the following SQL script (MySQL syntax) to create all tables. Adjust data types if your target database lacks JSON support.
+若需手动初始化数据库，可运行以下 MySQL 语法的 SQL 脚本来创建全部数据表。如目标数据库不支持 JSON 类型，请酌情调整字段类型。
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
@@ -120,18 +119,18 @@ CREATE TABLE IF NOT EXISTS chart_tasks (
 );
 ```
 
-## Simulated chart processing
+## 图表处理模拟流程
 
-The current implementation includes a simulated cloud processing pipeline (`backend/utils/chart_processing.py`). It opens the uploaded image, generates pseudo-random data points, and creates an accessible HTML code snippet. Replace the simulation with your actual cloud-based pipeline by updating the `process_chart` function.
+目前的实现提供了一个模拟的云端处理管线（`backend/utils/chart_processing.py`）。该模块会打开上传图片、生成伪随机的数据点，并构建一段无障碍 HTML 代码。若需接入真实的云端分析服务，只需在 `process_chart` 函数中替换具体实现即可。
 
-## Testing the workflow
+## 工作流测试指南
 
-1. Register a new user via the front-end or API.
-2. Create optional groups to organise chart conversions.
-3. Upload a chart image to start a task. The dashboard refresh button retrieves the latest status.
-4. Open a task detail page to inspect summaries, review the generated accessible component code, and customise the output. Use the embedded preview to validate changes.
-5. Save custom code snippets or regenerate them from the stored data points.
+1. 通过前端界面或 API 注册新用户。
+2. 视需要创建图表分组，用于管理转换结果。
+3. 上传图表图片以创建任务，可通过仪表盘上的刷新按钮获取最新状态。
+4. 打开任务详情页查看摘要、检阅生成的无障碍组件代码并进行定制，内嵌预览可用于验证修改效果。
+5. 保存自定义代码片段，或基于已有数据点重新生成基线代码。
 
 ---
 
-This project provides a foundation for building a production-ready accessibility tooling suite. Extend it with real chart analysis pipelines, stricter validation, and additional user collaboration features as needed.
+本项目为构建生产级无障碍图表工具链提供了基础，可按需扩展真实的图表分析流程、更严格的校验逻辑以及更多用户协作能力。
