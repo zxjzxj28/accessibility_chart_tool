@@ -2,31 +2,31 @@
   <div class="detail-page" v-if="task">
     <header class="detail-header">
       <div>
-        <button class="ghost" @click="goBack">← Back to dashboard</button>
+        <button class="ghost" @click="goBack">← 返回仪表盘</button>
         <h1>{{ task.title }}</h1>
-        <div class="status" :class="task.status">{{ task.status }}</div>
+        <div class="status" :class="task.status">{{ statusLabel }}</div>
       </div>
       <div class="header-actions">
-        <button class="primary" @click="regenerateCode" :disabled="regenerating">Regenerate code</button>
-        <button class="secondary" @click="refresh">Refresh</button>
+        <button class="primary" @click="regenerateCode" :disabled="regenerating">重新生成代码</button>
+        <button class="secondary" @click="refresh">刷新</button>
       </div>
     </header>
 
     <section class="info-grid">
       <article class="card">
-        <h2>Chart summary</h2>
-        <p>{{ task.summary || 'Summary will appear once processing completes.' }}</p>
+        <h2>图表摘要</h2>
+        <p>{{ task.summary || '处理中完成后将显示摘要。' }}</p>
         <div class="image-preview" v-if="task.image_path">
-          <img :src="imageSource" alt="Chart preview" />
+          <img :src="imageSource" alt="图表预览" />
         </div>
       </article>
       <article class="card">
-        <h2>Data points</h2>
+        <h2>数据点</h2>
         <table v-if="task.table_data?.length">
           <thead>
             <tr>
-              <th>Label</th>
-              <th>Value</th>
+              <th>标签</th>
+              <th>数值</th>
             </tr>
           </thead>
           <tbody>
@@ -36,7 +36,7 @@
             </tr>
           </tbody>
         </table>
-        <p v-else class="muted">No structured data available yet.</p>
+        <p v-else class="muted">暂未生成结构化数据。</p>
       </article>
     </section>
 
@@ -44,12 +44,12 @@
       <article class="card">
         <header class="card-header">
           <div>
-            <h2>Accessible component code</h2>
-            <p class="muted">Update the code and refresh the preview. Saving stores a custom snippet for this task.</p>
+            <h2>无障碍组件代码</h2>
+            <p class="muted">修改代码并刷新预览，保存后会将自定义片段与该任务关联。</p>
           </div>
           <div class="button-group">
-            <button class="ghost" @click="resetToGenerated">Use generated code</button>
-            <button class="primary" @click="saveCustomCode">Save custom code</button>
+            <button class="ghost" @click="resetToGenerated">恢复生成代码</button>
+            <button class="primary" @click="saveCustomCode">保存自定义代码</button>
           </div>
         </header>
         <textarea v-model="editedCode" spellcheck="false"></textarea>
@@ -57,15 +57,15 @@
       <article class="card preview-card">
         <header class="card-header">
           <div>
-            <h2>Preview</h2>
-            <p class="muted">Rendered with the code above inside a sandboxed frame.</p>
+            <h2>预览</h2>
+            <p class="muted">在隔离的 iframe 中使用上述代码实时渲染。</p>
           </div>
-          <button class="secondary" @click="refreshPreview">Refresh preview</button>
+          <button class="secondary" @click="refreshPreview">刷新预览</button>
         </header>
         <iframe
           :key="previewKey"
           class="preview-frame"
-          title="Preview"
+          title="预览"
           sandbox="allow-scripts allow-same-origin"
           :srcdoc="previewHtml"
         ></iframe>
@@ -73,7 +73,7 @@
     </section>
   </div>
   <div v-else class="loading-state">
-    Loading task details...
+    正在加载任务详情...
   </div>
 </template>
 
@@ -89,6 +89,14 @@ const task = ref(null);
 const editedCode = ref('');
 const previewKey = ref(0);
 const regenerating = ref(false);
+
+const statusLabels = {
+  pending: '排队中',
+  processing: '处理中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+};
 
 const taskId = route.params.id;
 
@@ -135,10 +143,12 @@ const goBack = () => {
 
 const imageSource = computed(() => task.value?.image_url || '');
 
+const statusLabel = computed(() => statusLabels[task.value?.status] || task.value?.status || '');
+
 const previewHtml = computed(
   () =>
     editedCode.value ||
-    '<p style="font-family: system-ui, sans-serif; color: #475569; padding: 24px;">No code available yet.</p>'
+    '<p style="font-family: system-ui, sans-serif; color: #475569; padding: 24px;">暂时没有可用代码。</p>'
 );
 
 onMounted(async () => {

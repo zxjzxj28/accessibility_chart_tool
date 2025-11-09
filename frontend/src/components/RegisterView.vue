@@ -1,29 +1,29 @@
 <template>
   <div class="auth-layout">
     <div class="panel">
-      <h1>Create your account</h1>
-      <p class="subtitle">Join the platform and generate accessible chart components.</p>
+      <h1>创建你的账号</h1>
+      <p class="subtitle">加入平台，生成可复用的无障碍图表组件。</p>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
-          Name
-          <input v-model="name" type="text" required placeholder="Jane Doe" />
+          姓名
+          <input v-model="name" type="text" required placeholder="张三" />
         </label>
         <label>
-          Email
+          邮箱
           <input v-model="email" type="email" required placeholder="you@example.com" />
         </label>
         <label>
-          Password
+          密码
           <input v-model="password" type="password" required placeholder="••••••••" />
         </label>
         <button type="submit" :disabled="loading">
-          <span v-if="loading">Creating account...</span>
-          <span v-else>Register</span>
+          <span v-if="loading">正在创建账号...</span>
+          <span v-else>注册</span>
         </button>
       </form>
       <p class="hint">
-        Already have an account?
-        <router-link to="/login">Sign in</router-link>
+        已经有账号了？
+        <router-link to="/login">前往登录</router-link>
       </p>
       <p v-if="message" class="success">{{ message }}</p>
       <p v-if="error" class="error">{{ error }}</p>
@@ -52,10 +52,10 @@ const handleSubmit = async () => {
   message.value = '';
   try {
     await auth.register({ name: name.value, email: email.value, password: password.value });
-    message.value = 'Account created. Redirecting to sign in...';
+    message.value = '账号已创建，即将跳转到登录页...';
     setTimeout(() => router.push('/login'), 1200);
   } catch (err) {
-    error.value = err.response?.data?.message || 'Unable to register.';
+    error.value = err.response?.data?.message || '注册失败，请稍后重试。';
   } finally {
     loading.value = false;
   }
