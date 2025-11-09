@@ -22,3 +22,11 @@ frontend/dist/
 
 # macOS
 .DS_Store
+
+# sh
+mysql.sh
+
+# mysql
+mysql_3328/
+
+data/
