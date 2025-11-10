@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
 from ..extensions import db
@@ -39,14 +39,20 @@ def login():
     if not user or not password or not user.check_password(password):
         return jsonify({"message": "Invalid credentials."}), 401
 
-    token = create_access_token(identity=user.id)
+    audience = current_app.config.get("JWT_DECODE_AUDIENCE")
+    additional_claims = {"aud": audience} if audience else None
+    token = create_access_token(identity=str(user.id), additional_claims=additional_claims)
     return jsonify({"access_token": token, "user": user.to_dict()})
 
 
 @bp.post("/change-password")
 @jwt_required()
 def change_password():
-    user_id = get_jwt_identity()
+    identity = get_jwt_identity()
+    try:
+        user_id = int(identity)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid authentication token."}), 401
     payload = request.get_json() or {}
     current_password = payload.get("current_password")
     new_password = payload.get("new_password")

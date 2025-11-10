@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from flask import current_app, jsonify, request, send_from_directory, url_for
+from flask import abort, current_app, jsonify, request, send_from_directory, url_for
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from werkzeug.utils import secure_filename
 
@@ -12,6 +12,14 @@ from ..models import ChartGroup, ChartTask
 from ..tasks import TaskPayload, worker
 from ..utils.chart_processing import build_accessible_code
 from . import bp
+
+
+def _current_user_id() -> int:
+    identity = get_jwt_identity()
+    try:
+        return int(identity)
+    except (TypeError, ValueError):
+        abort(401, description="Invalid authentication token.")
 
 
 def _ensure_owner(task: ChartTask, user_id: int):
@@ -29,7 +37,7 @@ def serve_upload(filename: str):
 @bp.get("/groups")
 @jwt_required()
 def list_groups():
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     groups = ChartGroup.query.filter_by(user_id=user_id).order_by(ChartGroup.created_at.desc()).all()
     return jsonify([group.to_dict() for group in groups])
 
@@ -37,7 +45,7 @@ def list_groups():
 @bp.post("/groups")
 @jwt_required()
 def create_group():
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     payload = request.get_json() or {}
     name = (payload.get("name") or "").strip()
     if not name:
@@ -51,7 +59,7 @@ def create_group():
 @bp.delete("/groups/<int:group_id>")
 @jwt_required()
 def delete_group(group_id: int):
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     group = ChartGroup.query.get_or_404(group_id)
     if group.user_id != user_id:
         return jsonify({"message": "Not found."}), 404
@@ -65,7 +73,7 @@ def delete_group(group_id: int):
 @bp.get("/tasks")
 @jwt_required()
 def list_tasks():
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     group_id = request.args.get("group_id")
     query = ChartTask.query.filter_by(user_id=user_id)
     if group_id:
@@ -77,7 +85,7 @@ def list_tasks():
 @bp.post("/tasks")
 @jwt_required()
 def create_task():
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     if "image" not in request.files:
         return jsonify({"message": "Image file is required."}), 400
 
@@ -117,7 +125,7 @@ def create_task():
 @bp.get("/tasks/<int:task_id>")
 @jwt_required()
 def get_task(task_id: int):
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     task = ChartTask.query.get_or_404(task_id)
     response = _ensure_owner(task, user_id)
     if response:
@@ -128,7 +136,7 @@ def get_task(task_id: int):
 @bp.delete("/tasks/<int:task_id>")
 @jwt_required()
 def delete_task(task_id: int):
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     task = ChartTask.query.get_or_404(task_id)
     response = _ensure_owner(task, user_id)
     if response:
@@ -146,7 +154,7 @@ def delete_task(task_id: int):
 @bp.post("/tasks/<int:task_id>/cancel")
 @jwt_required()
 def cancel_task(task_id: int):
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     task = ChartTask.query.get_or_404(task_id)
     response = _ensure_owner(task, user_id)
     if response:
@@ -163,7 +171,7 @@ def cancel_task(task_id: int):
 @bp.post("/tasks/<int:task_id>/custom-code")
 @jwt_required()
 def update_custom_code(task_id: int):
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     task = ChartTask.query.get_or_404(task_id)
     response = _ensure_owner(task, user_id)
     if response:
@@ -179,7 +187,7 @@ def update_custom_code(task_id: int):
 @bp.post("/tasks/<int:task_id>/regenerate-code")
 @jwt_required()
 def regenerate_code(task_id: int):
-    user_id = get_jwt_identity()
+    user_id = _current_user_id()
     task = ChartTask.query.get_or_404(task_id)
     response = _ensure_owner(task, user_id)
     if response:
