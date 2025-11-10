@@ -11,17 +11,21 @@ from . import bp
 @bp.post("/register")
 def register():
     payload = request.get_json() or {}
-    name = payload.get("name")
+    name = (payload.get("name") or "").strip()
     email = (payload.get("email") or "").lower().strip()
+    username = (payload.get("username") or "").strip()
     password = payload.get("password")
 
-    if not all([name, email, password]):
+    if not all([name, email, username, password]):
         return jsonify({"message": "Missing required fields."}), 400
 
     if User.query.filter_by(email=email).first():
         return jsonify({"message": "Email already registered."}), 400
 
-    user = User(name=name, email=email)
+    if User.query.filter_by(username=username).first():
+        return jsonify({"message": "Username already registered."}), 400
+
+    user = User(name=name, email=email, username=username)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
@@ -32,10 +36,15 @@ def register():
 @bp.post("/login")
 def login():
     payload = request.get_json() or {}
-    email = (payload.get("email") or "").lower().strip()
+    identifier = (payload.get("identifier") or "").strip()
     password = payload.get("password")
 
-    user = User.query.filter_by(email=email).first()
+    user: User | None = None
+    if "@" in identifier:
+        user = User.query.filter_by(email=identifier.lower()).first()
+    else:
+        user = User.query.filter_by(username=identifier).first()
+
     if not user or not password or not user.check_password(password):
         return jsonify({"message": "Invalid credentials."}), 401
 

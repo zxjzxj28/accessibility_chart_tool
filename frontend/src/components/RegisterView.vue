@@ -9,6 +9,10 @@
           <input v-model="name" type="text" required placeholder="张三" />
         </label>
         <label>
+          账号
+          <input v-model="username" type="text" required placeholder="请输入账号名称" />
+        </label>
+        <label>
           邮箱
           <input v-model="email" type="email" required placeholder="请输入邮箱地址" />
         </label>
@@ -41,6 +45,7 @@ const auth = useAuthStore();
 
 const name = ref('');
 const email = ref('');
+const username = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
@@ -51,7 +56,12 @@ const handleSubmit = async () => {
   error.value = '';
   message.value = '';
   try {
-    await auth.register({ name: name.value, email: email.value, password: password.value });
+    await auth.register({
+      name: name.value,
+      email: email.value,
+      username: username.value,
+      password: password.value
+    });
     message.value = '账号已创建，即将跳转到登录页...';
     setTimeout(() => router.push('/login'), 1200);
   } catch (err) {
