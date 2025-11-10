@@ -54,6 +54,13 @@ class ChartProcessingWorker:
                     task.data_points = result.get("data_points")
                     task.table_data = result.get("table_data")
                     task.generated_code = result.get("generated_code")
+                    task.java_code = result.get("java_code")
+                    task.kotlin_code = result.get("kotlin_code")
+                    task.integration_doc = result.get("integration_doc")
+                    if task.language == "java" and task.java_code:
+                        task.generated_code = task.java_code
+                    elif task.language == "kotlin" and task.kotlin_code:
+                        task.generated_code = task.kotlin_code
                     task.status = "completed"
                     db.session.commit()
                 except Exception as exc:  # pragma: no cover - defensive logging

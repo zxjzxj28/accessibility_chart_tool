@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
 from ..extensions import db
@@ -11,17 +11,21 @@ from . import bp
 @bp.post("/register")
 def register():
     payload = request.get_json() or {}
-    name = payload.get("name")
+    name = (payload.get("name") or "").strip()
     email = (payload.get("email") or "").lower().strip()
+    username = (payload.get("username") or "").strip()
     password = payload.get("password")
 
-    if not all([name, email, password]):
+    if not all([name, email, username, password]):
         return jsonify({"message": "Missing required fields."}), 400
 
     if User.query.filter_by(email=email).first():
         return jsonify({"message": "Email already registered."}), 400
 
-    user = User(name=name, email=email)
+    if User.query.filter_by(username=username).first():
+        return jsonify({"message": "Username already registered."}), 400
+
+    user = User(name=name, email=email, username=username)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
@@ -32,21 +36,32 @@ def register():
 @bp.post("/login")
 def login():
     payload = request.get_json() or {}
-    email = (payload.get("email") or "").lower().strip()
+    identifier = (payload.get("identifier") or "").strip()
     password = payload.get("password")
 
-    user = User.query.filter_by(email=email).first()
+    user: User | None = None
+    if "@" in identifier:
+        user = User.query.filter_by(email=identifier.lower()).first()
+    else:
+        user = User.query.filter_by(username=identifier).first()
+
     if not user or not password or not user.check_password(password):
         return jsonify({"message": "Invalid credentials."}), 401
 
-    token = create_access_token(identity=user.id)
+    audience = current_app.config.get("JWT_DECODE_AUDIENCE")
+    additional_claims = {"aud": audience} if audience else None
+    token = create_access_token(identity=str(user.id), additional_claims=additional_claims)
     return jsonify({"access_token": token, "user": user.to_dict()})
 
 
 @bp.post("/change-password")
 @jwt_required()
 def change_password():
-    user_id = get_jwt_identity()
+    identity = get_jwt_identity()
+    try:
+        user_id = int(identity)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid authentication token."}), 401
     payload = request.get_json() or {}
     current_password = payload.get("current_password")
     new_password = payload.get("new_password")

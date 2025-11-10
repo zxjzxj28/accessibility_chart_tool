@@ -4,9 +4,17 @@
       <h1>无障碍图表工具</h1>
       <p class="subtitle">登录以管理你的无障碍图表转换任务。</p>
       <form @submit.prevent="handleSubmit" class="form">
-        <label>
+        <div class="toggle-group">
+          <button type="button" :class="{ active: mode === 'email' }" @click="mode = 'email'">邮箱登录</button>
+          <button type="button" :class="{ active: mode === 'account' }" @click="mode = 'account'">账号登录</button>
+        </div>
+        <label v-if="mode === 'email'">
           邮箱
-          <input v-model="email" type="email" required placeholder="请输入邮箱地址" />
+          <input v-model="identifier" type="email" required placeholder="请输入邮箱地址" />
+        </label>
+        <label v-else>
+          账号
+          <input v-model="identifier" type="text" required placeholder="请输入账号名称" />
         </label>
         <label>
           密码
@@ -35,16 +43,18 @@ const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
 
-const email = ref('');
+const identifier = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
+const mode = ref('email');
 
 const handleSubmit = async () => {
   loading.value = true;
   error.value = '';
   try {
-    await auth.login({ email: email.value, password: password.value });
+    const value = mode.value === 'email' ? identifier.value.trim().toLowerCase() : identifier.value.trim();
+    await auth.login({ identifier: value, password: password.value });
     const redirect = route.query.redirect || '/';
     router.push(redirect);
   } catch (err) {
@@ -86,6 +96,27 @@ h1 {
 .form {
   display: grid;
   gap: 18px;
+}
+
+.toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.toggle-group button {
+  border: 1px solid #d9e2ec;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #486581;
+}
+
+.toggle-group button.active {
+  background: linear-gradient(135deg, #4c6ef5, #2b8aeb);
+  color: white;
+  border-color: #4c6ef5;
 }
 
 label {

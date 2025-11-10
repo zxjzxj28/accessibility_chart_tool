@@ -35,18 +35,33 @@
           >
             全部图表
           </button>
-          <button
-            v-for="group in groups"
-            :key="group.id"
-            class="group-pill"
-            :class="{ active: selectedGroup === group.id }"
-            @click="selectGroup(group.id)"
-          >
-            {{ group.name }}
-          </button>
+          <div v-for="group in flatGroups" :key="group.id" class="group-entry">
+            <div class="group-entry-main">
+              <button
+                class="group-pill"
+                :class="{ active: selectedGroup === group.id }"
+                :style="{ paddingLeft: `${16 + group.depth * 14}px` }"
+                @click="selectGroup(group.id)"
+              >
+                {{ group.name }}
+              </button>
+              <button class="icon" @click="startEditingGroup(group)" title="重命名">✎</button>
+            </div>
+            <div v-if="editingGroupId === group.id" class="group-edit">
+              <input v-model="editingGroupName" type="text" required />
+              <button type="button" class="primary" @click="submitGroupRename(group.id)">保存</button>
+              <button type="button" class="ghost" @click="cancelGroupRename">取消</button>
+            </div>
+          </div>
         </div>
         <form class="group-form" @submit.prevent="createGroup">
           <input v-model="newGroupName" type="text" placeholder="新分组名称" required />
+          <select v-model="parentForNewGroup">
+            <option :value="null">无父级分组</option>
+            <option v-for="group in flatGroups" :key="`parent-${group.id}`" :value="group.id">
+              {{ group.indentedName }}
+            </option>
+          </select>
           <button type="submit" class="primary">添加</button>
         </form>
         <p v-if="groupMessage" class="info">{{ groupMessage }}</p>
@@ -74,7 +89,16 @@
               指定分组
               <select v-model="selectedGroupForUpload">
                 <option :value="null">不分组</option>
-                <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+                <option v-for="group in flatGroups" :key="`upload-${group.id}`" :value="group.id">
+                  {{ group.indentedName }}
+                </option>
+              </select>
+            </label>
+            <label>
+              生成语言
+              <select v-model="uploadLanguage">
+                <option value="java">Java</option>
+                <option value="kotlin">Kotlin</option>
               </select>
             </label>
           </div>
@@ -103,18 +127,57 @@
             <div class="actions">
               <router-link :to="`/tasks/${task.id}`" class="primary">查看详情</router-link>
               <button v-if="canCancel(task.status)" class="ghost" @click="cancelTask(task.id)">取消任务</button>
-              <button class="ghost danger" @click="deleteTask(task.id)">删除</button>
+              <button class="ghost" @click="openTaskEditor(task)">编辑信息</button>
             </div>
           </article>
           <div v-if="!tasks.length" class="empty">暂无任务，请上传图表开始体验。</div>
         </div>
+        <div class="pagination" v-if="pagination.pages > 1">
+          <button class="ghost" :disabled="pagination.page === 1" @click="changePage(pagination.page - 1)">上一页</button>
+          <span>第 {{ pagination.page }} / {{ pagination.pages }} 页，共 {{ pagination.total }} 条</span>
+          <button class="ghost" :disabled="pagination.page === pagination.pages" @click="changePage(pagination.page + 1)">下一页</button>
+        </div>
       </section>
     </main>
+    <transition name="fade">
+      <div v-if="taskEditorVisible" class="modal-backdrop">
+        <div class="modal">
+          <h3>编辑任务</h3>
+          <form @submit.prevent="saveTaskEditor" class="modal-form">
+            <label>
+              任务名称
+              <input v-model="taskEditor.title" type="text" required />
+            </label>
+            <label>
+              所属分组
+              <select v-model="taskEditor.group_id">
+                <option :value="null">未分组</option>
+                <option v-for="group in flatGroups" :key="`edit-${group.id}`" :value="group.id">
+                  {{ group.indentedName }}
+                </option>
+              </select>
+            </label>
+            <label>
+              代码语言
+              <select v-model="taskEditor.language">
+                <option value="java">Java</option>
+                <option value="kotlin">Kotlin</option>
+              </select>
+            </label>
+            <div class="modal-actions">
+              <button type="submit" class="primary" :disabled="taskEditorLoading">保存</button>
+              <button type="button" class="ghost" @click="closeTaskEditor">取消</button>
+            </div>
+            <p v-if="taskEditorMessage" class="info">{{ taskEditorMessage }}</p>
+          </form>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
@@ -122,11 +185,12 @@ import { useAuthStore } from '../stores/auth';
 const auth = useAuthStore();
 const router = useRouter();
 
-const groups = ref([]);
+const groupTree = ref([]);
 const tasks = ref([]);
 const selectedGroup = ref(null);
 const selectedGroupForUpload = ref(null);
 const newGroupName = ref('');
+const parentForNewGroup = ref(null);
 const groupMessage = ref('');
 const uploadMessage = ref('');
 const taskMessage = ref('');
@@ -137,6 +201,14 @@ const showPassword = ref(false);
 const passwordLoading = ref(false);
 const passwordMessage = ref('');
 const passwordForm = reactive({ current_password: '', new_password: '' });
+const pagination = reactive({ page: 1, pages: 1, total: 0, pageSize: 10 });
+const uploadLanguage = ref('java');
+const editingGroupId = ref(null);
+const editingGroupName = ref('');
+const taskEditorVisible = ref(false);
+const taskEditorLoading = ref(false);
+const taskEditorMessage = ref('');
+const taskEditor = reactive({ id: null, title: '', group_id: null, language: 'java' });
 
 const statusLabels = {
   pending: '排队中',
@@ -148,15 +220,43 @@ const statusLabels = {
 
 const getStatusLabel = (status) => statusLabels[status] || status;
 
+const flatGroups = computed(() => {
+  const result = [];
+  const traverse = (items, depth = 0) => {
+    items.forEach((item) => {
+      const indent = depth > 0 ? `${'　'.repeat(depth - 1)}└ ` : '';
+      const entry = {
+        id: item.id,
+        name: item.name,
+        depth,
+        indentedName: `${indent}${item.name}`
+      };
+      result.push(entry);
+      if (item.children?.length) {
+        traverse(item.children, depth + 1);
+      }
+    });
+  };
+  traverse(groupTree.value);
+  return result;
+});
+
 const fetchTasks = async () => {
-  const params = selectedGroup.value ? { group_id: selectedGroup.value } : {};
+  const params = { page: pagination.page, page_size: pagination.pageSize };
+  if (selectedGroup.value) {
+    params.group_id = selectedGroup.value;
+  }
   const { data } = await axios.get('/api/tasks', { params });
-  tasks.value = data;
+  tasks.value = data.items;
+  pagination.page = data.page;
+  pagination.pages = data.pages;
+  pagination.total = data.total;
+  pagination.pageSize = data.page_size;
 };
 
 const fetchGroups = async () => {
   const { data } = await axios.get('/api/groups');
-  groups.value = data;
+  groupTree.value = data;
 };
 
 const refreshTasks = async () => {
@@ -178,18 +278,50 @@ const refreshGroups = async () => {
 
 const selectGroup = async (groupId) => {
   selectedGroup.value = groupId;
+  pagination.page = 1;
   await refreshTasks();
 };
 
 const createGroup = async () => {
   if (!newGroupName.value.trim()) return;
   try {
-    const { data } = await axios.post('/api/groups', { name: newGroupName.value });
-    groups.value.unshift(data);
-    groupMessage.value = `已创建分组「${data.name}」。`;
+    const payload = { name: newGroupName.value };
+    if (parentForNewGroup.value) {
+      payload.parent_id = parentForNewGroup.value;
+    }
+    await axios.post('/api/groups', payload);
+    groupMessage.value = `已创建分组「${newGroupName.value}」。`;
     newGroupName.value = '';
+    parentForNewGroup.value = null;
+    await refreshGroups();
   } catch (err) {
     groupMessage.value = err.response?.data?.message || '无法创建分组。';
+  }
+};
+
+const startEditingGroup = (group) => {
+  editingGroupId.value = group.id;
+  editingGroupName.value = group.name;
+};
+
+const cancelGroupRename = () => {
+  editingGroupId.value = null;
+  editingGroupName.value = '';
+};
+
+const submitGroupRename = async (groupId) => {
+  if (!editingGroupName.value.trim()) {
+    groupMessage.value = '分组名称不能为空。';
+    return;
+  }
+  try {
+    await axios.patch(`/api/groups/${groupId}`, { name: editingGroupName.value });
+    groupMessage.value = '分组名称已更新。';
+    await refreshGroups();
+  } catch (err) {
+    groupMessage.value = err.response?.data?.message || '无法更新分组名称。';
+  } finally {
+    cancelGroupRename();
   }
 };
 
@@ -209,6 +341,7 @@ const submitTask = async () => {
     if (selectedGroupForUpload.value) {
       formData.append('group_id', selectedGroupForUpload.value);
     }
+    formData.append('language', uploadLanguage.value);
     await axios.post('/api/tasks', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     uploadMessage.value = '任务已创建，后台将继续处理。';
     title.value = '';
@@ -231,16 +364,6 @@ const cancelTask = async (taskId) => {
   }
 };
 
-const deleteTask = async (taskId) => {
-  try {
-    await axios.delete(`/api/tasks/${taskId}`);
-    taskMessage.value = '任务已删除。';
-    await refreshTasks();
-  } catch (err) {
-    taskMessage.value = err.response?.data?.message || '无法删除任务。';
-  }
-};
-
 const canCancel = (status) => ['pending', 'processing'].includes(status);
 
 const formatDate = (iso) => new Date(iso).toLocaleString();
@@ -248,6 +371,52 @@ const formatDate = (iso) => new Date(iso).toLocaleString();
 const logout = () => {
   auth.logout();
   router.push('/login');
+};
+
+const openTaskEditor = (task) => {
+  taskEditor.id = task.id;
+  taskEditor.title = task.title;
+  taskEditor.group_id = task.group_id ?? null;
+  taskEditor.language = task.language || 'java';
+  taskEditorVisible.value = true;
+  taskEditorMessage.value = '';
+};
+
+const closeTaskEditor = () => {
+  taskEditorVisible.value = false;
+  taskEditor.id = null;
+  taskEditor.title = '';
+  taskEditor.group_id = null;
+  taskEditor.language = 'java';
+  taskEditorLoading.value = false;
+};
+
+const saveTaskEditor = async () => {
+  if (!taskEditor.id) return;
+  taskEditorLoading.value = true;
+  taskEditorMessage.value = '';
+  try {
+    const payload = {
+      title: taskEditor.title,
+      group_id: taskEditor.group_id,
+      language: taskEditor.language
+    };
+    await axios.patch(`/api/tasks/${taskEditor.id}`, payload);
+    taskEditorMessage.value = '任务信息已更新。';
+    await refreshTasks();
+    setTimeout(() => {
+      closeTaskEditor();
+    }, 500);
+  } catch (err) {
+    taskEditorMessage.value = err.response?.data?.message || '无法更新任务信息。';
+  } finally {
+    taskEditorLoading.value = false;
+  }
+};
+
+const changePage = async (target) => {
+  pagination.page = target;
+  await refreshTasks();
 };
 
 const updatePassword = async () => {
@@ -344,6 +513,35 @@ onMounted(async () => {
   gap: 10px;
 }
 
+.group-entry {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.group-entry-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-entry .icon {
+  border: none;
+  background: transparent;
+  color: #5f6c7b;
+  font-size: 0.9rem;
+  padding: 6px;
+}
+
+.group-entry .icon:hover {
+  color: #364fc7;
+}
+
+.group-edit {
+  display: flex;
+  gap: 6px;
+}
+
 .group-pill {
   border: none;
   padding: 8px 14px;
@@ -367,6 +565,7 @@ onMounted(async () => {
 .group-form {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .group-form input {
@@ -374,6 +573,14 @@ onMounted(async () => {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid #d9e2ec;
+}
+
+.group-form select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d9e2ec;
+  min-width: 140px;
+  background: #f8fafc;
 }
 
 .content {
@@ -512,6 +719,18 @@ select {
   gap: 10px;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pagination button {
+  min-width: 90px;
+}
+
 .empty {
   grid-column: 1 / -1;
   padding: 40px;
@@ -520,6 +739,40 @@ select {
   border: 2px dashed #d9e2ec;
   border-radius: 18px;
   background: #f8fafc;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  width: min(420px, 90%);
+  background: white;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 25px 45px rgba(15, 23, 42, 0.2);
+}
+
+.modal h3 {
+  margin-top: 0;
+  color: #243b53;
+}
+
+.modal-form {
+  display: grid;
+  gap: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .primary,

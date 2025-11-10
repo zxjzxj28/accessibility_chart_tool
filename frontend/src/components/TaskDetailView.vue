@@ -9,6 +9,7 @@
       <div class="header-actions">
         <button class="primary" @click="regenerateCode" :disabled="regenerating">重新生成代码</button>
         <button class="secondary" @click="refresh">刷新</button>
+        <button class="ghost" @click="downloadPackage">下载代码压缩包</button>
       </div>
     </header>
 
@@ -44,31 +45,51 @@
       <article class="card">
         <header class="card-header">
           <div>
-            <h2>无障碍组件代码</h2>
-            <p class="muted">修改代码并刷新预览，保存后会将自定义片段与该任务关联。</p>
+            <h2>Android 代码片段</h2>
+            <p class="muted">为当前语言调优代码，保存后即可在下载包中获取自定义版本。</p>
           </div>
           <div class="button-group">
+            <div class="language-tabs">
+              <button
+                type="button"
+                :class="{ active: activeLanguage === 'java' }"
+                @click="switchLanguage('java')"
+              >Java</button>
+              <button
+                type="button"
+                :class="{ active: activeLanguage === 'kotlin' }"
+                @click="switchLanguage('kotlin')"
+              >Kotlin</button>
+            </div>
             <button class="ghost" @click="resetToGenerated">恢复生成代码</button>
             <button class="primary" @click="saveCustomCode">保存自定义代码</button>
           </div>
         </header>
         <textarea v-model="editedCode" spellcheck="false"></textarea>
+        <p v-if="saveMessage" class="info">{{ saveMessage }}</p>
       </article>
-      <article class="card preview-card">
+      <article class="card integration-card">
         <header class="card-header">
           <div>
-            <h2>预览</h2>
-            <p class="muted">在隔离的 iframe 中使用上述代码实时渲染。</p>
+            <h2>集成说明</h2>
+            <p class="muted">根据语言选择相应步骤完成在 Android 项目中的落地。</p>
           </div>
-          <button class="secondary" @click="refreshPreview">刷新预览</button>
         </header>
-        <iframe
-          :key="previewKey"
-          class="preview-frame"
-          title="预览"
-          sandbox="allow-scripts allow-same-origin"
-          :srcdoc="previewHtml"
-        ></iframe>
+        <div class="integration-block">
+          <h3>Java 集成步骤</h3>
+          <ol>
+            <li v-for="(step, index) in javaSteps" :key="`java-${index}`">{{ step }}</li>
+            <li v-if="!javaSteps.length" class="muted">暂无说明。</li>
+          </ol>
+        </div>
+        <div class="integration-block">
+          <h3>Kotlin 集成步骤</h3>
+          <ol>
+            <li v-for="(step, index) in kotlinSteps" :key="`kotlin-${index}`">{{ step }}</li>
+            <li v-if="!kotlinSteps.length" class="muted">暂无说明。</li>
+          </ol>
+        </div>
+        <p v-if="downloadMessage" class="info">{{ downloadMessage }}</p>
       </article>
     </section>
   </div>
@@ -78,7 +99,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
@@ -87,8 +108,10 @@ const router = useRouter();
 
 const task = ref(null);
 const editedCode = ref('');
-const previewKey = ref(0);
+const activeLanguage = ref('java');
 const regenerating = ref(false);
+const saveMessage = ref('');
+const downloadMessage = ref('');
 
 const statusLabels = {
   pending: '排队中',
@@ -103,53 +126,97 @@ const taskId = route.params.id;
 const fetchTask = async () => {
   const { data } = await axios.get(`/api/tasks/${taskId}`);
   task.value = data;
-  editedCode.value = data.custom_code || data.generated_code || '';
+  activeLanguage.value = data.language || 'java';
+  applyLanguageCode();
 };
 
 const refresh = async () => {
   await fetchTask();
-  refreshPreview();
-};
-
-const refreshPreview = () => {
-  previewKey.value += 1;
 };
 
 const saveCustomCode = async () => {
-  await axios.post(`/api/tasks/${taskId}/custom-code`, { custom_code: editedCode.value });
-  await fetchTask();
-  refreshPreview();
+  saveMessage.value = '';
+  try {
+    await axios.post(`/api/tasks/${taskId}/custom-code`, {
+      language: activeLanguage.value,
+      code: editedCode.value
+    });
+    await fetchTask();
+    saveMessage.value = '自定义代码已保存。';
+  } catch (err) {
+    saveMessage.value = err.response?.data?.message || '保存失败，请稍后重试。';
+  }
 };
 
 const regenerateCode = async () => {
   regenerating.value = true;
   try {
-    await axios.post(`/api/tasks/${taskId}/regenerate-code`);
+    await axios.post(`/api/tasks/${taskId}/regenerate-code`, { language: activeLanguage.value });
     await fetchTask();
-    refreshPreview();
+    saveMessage.value = `已重新生成 ${activeLanguage.value === 'java' ? 'Java' : 'Kotlin'} 代码。`;
+  } catch (err) {
+    saveMessage.value = err.response?.data?.message || '重新生成失败，请稍后再试。';
   } finally {
     regenerating.value = false;
   }
 };
 
 const resetToGenerated = () => {
-  editedCode.value = task.value.generated_code || '';
-  refreshPreview();
+  const base = getBaseCode(activeLanguage.value);
+  editedCode.value = base;
 };
 
 const goBack = () => {
   router.push('/');
 };
 
-const imageSource = computed(() => task.value?.image_url || '');
-
 const statusLabel = computed(() => statusLabels[task.value?.status] || task.value?.status || '');
 
-const previewHtml = computed(
-  () =>
-    editedCode.value ||
-    '<p style="font-family: system-ui, sans-serif; color: #475569; padding: 24px;">暂时没有可用代码。</p>'
+const javaSteps = computed(() => task.value?.integration_doc?.java || []);
+const kotlinSteps = computed(() => task.value?.integration_doc?.kotlin || []);
+
+const imageSource = computed(() => task.value?.image_url || '');
+
+const getBaseCode = (language) => {
+  if (!task.value) return '';
+  const base = language === 'java' ? task.value.java_code : task.value.kotlin_code;
+  const custom = task.value.custom_code?.[language];
+  return custom || base || '';
+};
+
+const applyLanguageCode = () => {
+  editedCode.value = getBaseCode(activeLanguage.value);
+};
+
+const switchLanguage = (language) => {
+  if (activeLanguage.value === language) return;
+  activeLanguage.value = language;
+  applyLanguageCode();
+  saveMessage.value = '';
+};
+
+watch(
+  () => task.value?.custom_code,
+  () => {
+    applyLanguageCode();
+  }
 );
+
+const downloadPackage = async () => {
+  downloadMessage.value = '';
+  try {
+    const response = await axios.get(`/api/tasks/${taskId}/download`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `task_${taskId}.zip`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    downloadMessage.value = err.response?.data?.message || '下载失败，请稍后再试。';
+  }
+};
 
 onMounted(async () => {
   await refresh();
@@ -235,16 +302,50 @@ textarea {
   background: #f8fafc;
 }
 
-.preview-card {
-  min-height: 340px;
+.language-tabs {
+  display: flex;
+  gap: 8px;
 }
 
-.preview-frame {
-  width: 100%;
-  min-height: 320px;
+.language-tabs button {
   border: 1px solid #d9e2ec;
-  border-radius: 12px;
-  background: white;
+  background: #f8fafc;
+  color: #486581;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.language-tabs button.active {
+  background: linear-gradient(135deg, #4c6ef5, #5f3dc4);
+  color: white;
+  border-color: #4c6ef5;
+}
+
+.integration-card {
+  gap: 12px;
+}
+
+.integration-block {
+  display: grid;
+  gap: 10px;
+}
+
+.integration-block h3 {
+  margin: 0;
+  color: #243b53;
+}
+
+.integration-block ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 6px;
+}
+
+.info {
+  color: #0f766e;
+  margin: 0;
 }
 
 .status {
