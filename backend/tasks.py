@@ -7,8 +7,9 @@ from typing import Optional
 from flask import Flask
 
 from .extensions import db
-from .models import ChartTask
+from .models import ChartTask, CodeTemplate
 from .utils.chart_processing import process_chart
+from .utils.template_engine import render_template_for_task
 
 
 @dataclass
@@ -57,7 +58,15 @@ class ChartProcessingWorker:
                     task.java_code = result.get("java_code")
                     task.kotlin_code = result.get("kotlin_code")
                     task.integration_doc = result.get("integration_doc")
-                    if task.language == "java" and task.java_code:
+                    if task.template_id:
+                        template = CodeTemplate.query.get(task.template_id)
+                        if template:
+                            try:
+                                task.generated_code = render_template_for_task(template, task)
+                                task.language = template.language
+                            except ValueError:
+                                pass
+                    elif task.language == "java" and task.java_code:
                         task.generated_code = task.java_code
                     elif task.language == "kotlin" and task.kotlin_code:
                         task.generated_code = task.kotlin_code
