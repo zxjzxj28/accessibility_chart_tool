@@ -159,6 +159,77 @@
         <p v-if="uploadMessage" class="info">{{ uploadMessage }}</p>
       </section>
 
+      <section class="template-card">
+        <h2>代码模板管理</h2>
+        <div class="template-layout">
+          <aside class="template-sidebar">
+            <div class="template-group" v-for="lang in ['java', 'kotlin']" :key="`tpl-group-${lang}`">
+              <div class="template-group-header">
+                <h3>{{ lang === 'java' ? 'Java 模板' : 'Kotlin 模板' }}</h3>
+                <button class="icon" @click="startNewTemplate(lang)" title="新增模板">＋</button>
+              </div>
+              <ul>
+                <li v-for="tpl in templatesByLanguage(lang)" :key="`tpl-list-${tpl.id}`">
+                  <button
+                    type="button"
+                    :class="{ active: templateEditor.id === String(tpl.id) }"
+                    @click="selectTemplateForEditing(tpl)"
+                  >
+                    {{ tpl.name }}
+                    <span v-if="tpl.is_system" class="tag">系统</span>
+                  </button>
+                </li>
+                <li v-if="!templatesByLanguage(lang).length" class="empty">暂无模板</li>
+              </ul>
+            </div>
+          </aside>
+          <div class="template-editor">
+            <form @submit.prevent="saveTemplate" class="template-form">
+              <div class="editor-row">
+                <label>
+                  模板名称
+                  <input v-model="templateEditor.name" type="text" :disabled="templateEditor.is_system" required />
+                </label>
+                <label>
+                  代码语言
+                  <select v-model="templateEditor.language" :disabled="templateEditor.id && templateEditor.is_system">
+                    <option value="java">Java</option>
+                    <option value="kotlin">Kotlin</option>
+                  </select>
+                </label>
+              </div>
+              <label class="copy-control">
+                从现有模板填充
+                <div class="copy-actions">
+                  <select v-model="templateCopySource">
+                    <option value="">选择模板</option>
+                    <option
+                      v-for="tpl in templatesByLanguage(templateEditor.language)"
+                      :key="`tpl-copy-${tpl.id}`"
+                      :value="String(tpl.id)"
+                    >
+                      {{ tpl.name }}
+                    </option>
+                  </select>
+                  <button type="button" class="ghost" @click="applyTemplateCopy" :disabled="!templateCopySource">填充</button>
+                </div>
+              </label>
+              <label>
+                模板内容
+                <textarea v-model="templateEditor.content" :readonly="templateEditor.is_system"></textarea>
+              </label>
+              <div class="template-actions">
+                <button type="button" class="ghost" @click="validateTemplate" :disabled="templateEditor.is_system">格式检查</button>
+                <button type="submit" class="primary" :disabled="templateEditor.is_system">保存模板</button>
+                <button type="button" class="secondary" @click="deleteTemplate" :disabled="!templateEditor.id || templateEditor.is_system">删除模板</button>
+              </div>
+              <p v-if="templateValidationMessage" class="info">{{ templateValidationMessage }}</p>
+              <p v-if="templateEditorMessage" class="info">{{ templateEditorMessage }}</p>
+            </form>
+          </div>
+        </div>
+      </section>
+
       <section class="task-section">
         <h2>最新任务</h2>
         <p v-if="taskMessage" class="info">{{ taskMessage }}</p>

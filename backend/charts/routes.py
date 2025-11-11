@@ -637,6 +637,21 @@ def update_task(task_id: int):
                 except ValueError:
                     pass
 
+    if template_id is not None:
+        if template_id == "":
+            task.template = None
+        else:
+            template = CodeTemplate.query.get(int(template_id))
+            if not template or not _ensure_template_access(template, user_id):
+                return jsonify({"message": "Template not found."}), 404
+            task.template = template
+            task.language = template.language
+            if task.status == "completed" and (task.java_code or task.kotlin_code):
+                try:
+                    task.generated_code = _render_template_for_task(template, task)
+                except ValueError:
+                    pass
+
     db.session.commit()
     return jsonify(task.to_dict())
 
