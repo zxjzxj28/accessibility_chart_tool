@@ -17,10 +17,17 @@ from flask import (
 )
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from ..extensions import db
-from ..models import ChartApplication, ChartGroup, ChartTask, CodeTemplate
+from ..models import (
+    ChartApplication,
+    ChartGroup,
+    ChartTask,
+    ChartTaskResult,
+    CodeTemplate,
+)
 from ..tasks import TaskPayload, worker
 from ..utils.chart_processing import build_accessible_code
 from ..utils.template_engine import (
@@ -85,14 +92,15 @@ def _ensure_template_access(template: CodeTemplate, user_id: int) -> bool:
 
 
 def _load_custom_code(task: ChartTask) -> dict[str, str]:
-    if not task.custom_code:
+    if not task.result or not task.result.custom_code:
         return {}
     try:
-        data = json.loads(task.custom_code)
+        data = json.loads(task.result.custom_code)
         if isinstance(data, dict):
             return {str(key): str(value) for key, value in data.items()}
     except (TypeError, json.JSONDecodeError):
-        return {"legacy": task.custom_code}
+        if task.result and task.result.custom_code:
+            return {"legacy": task.result.custom_code}
     return {}
 
 
@@ -225,7 +233,16 @@ def list_tasks():
     page_size = int(request.args.get("page_size", 10) or 10)
     page_size = max(1, min(page_size, 50))
 
-    query = ChartTask.query.filter_by(user_id=user_id)
+    query = (
+        ChartTask.query.filter_by(user_id=user_id)
+        .options(
+            joinedload(ChartTask.application),
+            joinedload(ChartTask.group),
+            joinedload(ChartTask.template),
+            joinedload(ChartTask.result),
+        )
+        .outerjoin(ChartTaskResult)
+    )
     if application_id:
         application = (
             ChartApplication.query.filter_by(id=int(application_id), user_id=user_id)
@@ -244,22 +261,25 @@ def list_tasks():
         pattern = f"%{search}%"
         query = query.filter(
             func.lower(ChartTask.title).like(pattern)
-            | func.lower(func.coalesce(ChartTask.summary, "")).like(pattern)
-            | func.lower(func.coalesce(ChartTask.description, "")).like(pattern)
+            | func.lower(func.coalesce(ChartTaskResult.summary, "")).like(pattern)
+            | func.lower(func.coalesce(ChartTaskResult.description, "")).like(pattern)
         )
 
-    pagination = query.order_by(ChartTask.created_at.desc()).paginate(
-        page=page, per_page=page_size, error_out=False
+    pagination = (
+        query.order_by(ChartTask.created_at.desc())
+        .paginate(page=page, per_page=page_size, error_out=False)
     )
+    items = [task.to_dict() for task in pagination.items]
     return jsonify(
         {
-            "items": [task.to_dict() for task in pagination.items],
+            "items": items,
             "page": pagination.page,
             "page_size": page_size,
             "pages": pagination.pages,
             "total": pagination.total,
         }
     )
+
 
 
 @bp.post("/tasks")
@@ -485,14 +505,18 @@ def delete_template(template_id: int):
     if template.is_system or template.user_id != user_id:
         return jsonify({"message": "Template not found."}), 404
 
-    affected_tasks = ChartTask.query.filter_by(template_id=template.id).all()
+    affected_tasks = (
+        ChartTask.query.options(joinedload(ChartTask.result))
+        .filter_by(template_id=template.id)
+        .all()
+    )
     for task in affected_tasks:
         task.template = None
-        if task.status == "completed":
-            if task.language == "java" and task.java_code:
-                task.generated_code = task.java_code
-            elif task.language == "kotlin" and task.kotlin_code:
-                task.generated_code = task.kotlin_code
+        if task.status == "completed" and task.result:
+            if task.language == "java" and task.result.java_code:
+                task.result.generated_code = task.result.java_code
+            elif task.language == "kotlin" and task.result.kotlin_code:
+                task.result.generated_code = task.result.kotlin_code
     db.session.delete(template)
     db.session.commit()
     return jsonify({"message": "Template deleted.", "affected_tasks": len(affected_tasks)})
@@ -517,7 +541,15 @@ def validate_template_endpoint():
 @jwt_required()
 def get_task(task_id: int):
     user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
+    task = (
+        ChartTask.query.options(
+            joinedload(ChartTask.result),
+            joinedload(ChartTask.application),
+            joinedload(ChartTask.template),
+        )
+        .filter_by(id=task_id)
+        .first_or_404()
+    )
     response = _ensure_owner(task, user_id)
     if response:
         return response
@@ -528,7 +560,11 @@ def get_task(task_id: int):
 @jwt_required()
 def update_task(task_id: int):
     user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
+    task = (
+        ChartTask.query.options(joinedload(ChartTask.result))
+        .filter_by(id=task_id)
+        .first_or_404()
+    )
     response = _ensure_owner(task, user_id)
     if response:
         return response
@@ -576,10 +612,30 @@ def update_task(task_id: int):
         if language not in {"java", "kotlin"}:
             return jsonify({"message": "Unsupported language."}), 400
         task.language = language
-        if language == "java" and task.java_code:
-            task.generated_code = task.java_code
-        if language == "kotlin" and task.kotlin_code:
-            task.generated_code = task.kotlin_code
+        if task.result:
+            if language == "java" and task.result.java_code:
+                task.result.generated_code = task.result.java_code
+            elif language == "kotlin" and task.result.kotlin_code:
+                task.result.generated_code = task.result.kotlin_code
+
+    if template_id is not None:
+        if template_id == "":
+            task.template = None
+        else:
+            template = CodeTemplate.query.get(int(template_id))
+            if not template or not _ensure_template_access(template, user_id):
+                return jsonify({"message": "Template not found."}), 404
+            task.template = template
+            task.language = template.language
+            if (
+                task.status == "completed"
+                and task.result
+                and (task.result.java_code or task.result.kotlin_code)
+            ):
+                try:
+                    task.result.generated_code = render_template_for_task(template, task)
+                except ValueError:
+                    pass
 
     if template_id is not None:
         if template_id == "":
@@ -639,10 +695,17 @@ def cancel_task(task_id: int):
 @jwt_required()
 def update_custom_code(task_id: int):
     user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
+    task = (
+        ChartTask.query.options(joinedload(ChartTask.result))
+        .filter_by(id=task_id)
+        .first_or_404()
+    )
     response = _ensure_owner(task, user_id)
     if response:
         return response
+
+    if not task.result or task.status != "completed":
+        return jsonify({"message": "任务尚未完成，无法保存自定义代码。"}), 400
 
     payload = request.get_json() or {}
     language = (payload.get("language") or task.language or "java").lower()
@@ -654,7 +717,7 @@ def update_custom_code(task_id: int):
         existing[language] = code
     else:
         existing.pop(language, None)
-    task.custom_code = json.dumps(existing) if existing else None
+    task.result.custom_code = json.dumps(existing) if existing else None
     db.session.commit()
     return jsonify(task.to_dict())
 
@@ -663,12 +726,16 @@ def update_custom_code(task_id: int):
 @jwt_required()
 def regenerate_code(task_id: int):
     user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
+    task = (
+        ChartTask.query.options(joinedload(ChartTask.result))
+        .filter_by(id=task_id)
+        .first_or_404()
+    )
     response = _ensure_owner(task, user_id)
     if response:
         return response
 
-    if not task.summary or not task.data_points:
+    if not task.result or not task.result.summary or not task.result.data_points:
         return jsonify({"message": "Task data not ready."}), 400
     language = (request.args.get("language") or task.language or "java").lower()
     payload = request.get_json(silent=True) or {}
@@ -677,15 +744,19 @@ def regenerate_code(task_id: int):
         return jsonify({"message": "Unsupported language."}), 400
 
     public_url = url_for("charts.serve_upload", filename=task.image_path, _external=True)
-    regenerated_bundle = build_accessible_code(public_url, task.summary, task.data_points)
+    regenerated_bundle = build_accessible_code(
+        public_url, task.result.summary, task.result.data_points
+    )
     if language == "java":
-        task.java_code = regenerated_bundle.get("java")
+        task.result.java_code = regenerated_bundle.get("java")
     else:
-        task.kotlin_code = regenerated_bundle.get("kotlin")
+        task.result.kotlin_code = regenerated_bundle.get("kotlin")
 
     if task.language == language:
-        task.generated_code = regenerated_bundle.get(language)
-    task.integration_doc = regenerated_bundle.get("integration") or task.integration_doc
+        task.result.generated_code = regenerated_bundle.get(language)
+    task.result.integration_doc = (
+        regenerated_bundle.get("integration") or task.result.integration_doc
+    )
     db.session.commit()
     return jsonify(task.to_dict())
 
@@ -694,7 +765,11 @@ def regenerate_code(task_id: int):
 @jwt_required()
 def render_template_endpoint(task_id: int):
     user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
+    task = (
+        ChartTask.query.options(joinedload(ChartTask.result))
+        .filter_by(id=task_id)
+        .first_or_404()
+    )
     response = _ensure_owner(task, user_id)
     if response:
         return response
@@ -723,12 +798,18 @@ def render_template_endpoint(task_id: int):
 @jwt_required()
 def download_code_archive(task_id: int):
     user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
+    task = (
+        ChartTask.query.options(joinedload(ChartTask.result))
+        .filter_by(id=task_id)
+        .first_or_404()
+    )
     response = _ensure_owner(task, user_id)
     if response:
         return response
 
-    if not task.java_code and not task.kotlin_code:
+    if not task.result or (
+        not (task.result.java_code or task.result.kotlin_code or task.result.generated_code)
+    ):
         return jsonify({"message": "Task code not ready."}), 400
 
     custom = _load_custom_code(task)
@@ -742,21 +823,25 @@ def download_code_archive(task_id: int):
             "",
             "该压缩包包含 Java 与 Kotlin 两种语言的示例代码，以及集成步骤说明。",
         ]
-        if task.summary:
+        if task.result and task.result.summary:
             summary_lines.append("")
             summary_lines.append("图表摘要：")
-            summary_lines.append(task.summary)
+            summary_lines.append(task.result.summary)
         archive.writestr("README.md", "\n".join(summary_lines))
 
-        java_source = custom.get("java") or task.java_code or ""
-        kotlin_source = custom.get("kotlin") or task.kotlin_code or ""
+        java_source = custom.get("java") or task.result.java_code or ""
+        kotlin_source = custom.get("kotlin") or task.result.kotlin_code or ""
+        if not java_source and task.result.generated_code and task.language == "java":
+            java_source = task.result.generated_code
+        if not kotlin_source and task.result.generated_code and task.language == "kotlin":
+            kotlin_source = task.result.generated_code
 
         if java_source:
             archive.writestr("java/AccessibleChartActivity.java", java_source)
         if kotlin_source:
             archive.writestr("kotlin/AccessibleChartActivity.kt", kotlin_source)
 
-        integration = task.integration_doc or {}
+        integration = task.result.integration_doc or {}
         java_steps = integration.get("java") or []
         kotlin_steps = integration.get("kotlin") or []
         archive.writestr(

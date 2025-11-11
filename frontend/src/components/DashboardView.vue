@@ -99,6 +99,7 @@
             placeholder="按关键字检索任务"
             @keyup.enter="refreshTasks"
           />
+          <router-link class="secondary" to="/templates">模板管理</router-link>
           <button class="primary" @click="refreshTasks">刷新任务</button>
         </div>
       </header>
@@ -113,21 +114,22 @@
               <input v-model="title" type="text" placeholder="示例：一季度营销漏斗" required />
             </label>
             <label>
-              指定应用
-              <select v-model="selectedApplicationForUpload">
-                <option value="">自动选择</option>
-                <option v-for="app in applications" :key="`upload-app-${app.id}`" :value="String(app.id)">
-                  {{ app.name }}
-                </option>
-              </select>
-            </label>
-            <label>
-              新应用名称
-              <input v-model="newApplicationName" type="text" placeholder="填写后将自动创建" />
+              所属应用
+              <div class="combo-field">
+                <input
+                  v-model="applicationInput"
+                  type="text"
+                  list="application-options"
+                  placeholder="留空则使用默认应用，或直接输入新应用名称"
+                />
+                <datalist id="application-options">
+                  <option v-for="app in applications" :key="`option-app-${app.id}`" :value="app.name"></option>
+                </datalist>
+              </div>
             </label>
             <label>
               指定分组
-              <select v-model="selectedGroupForUpload" :disabled="Boolean(newApplicationName.trim()) || !uploadGroups.length">
+              <select v-model="selectedGroupForUpload" :disabled="!uploadGroups.length">
                 <option value="">不分组</option>
                 <option v-for="group in uploadGroups" :key="`upload-group-${group.id}`" :value="String(group.id)">
                   {{ group.indentedName }}
@@ -325,15 +327,10 @@ const router = useRouter();
 const applications = ref([]);
 const templates = ref([]);
 const tasks = ref([]);
-const templateEditor = reactive({ id: '', name: '', language: 'java', content: '', is_system: false });
-const templateEditorMessage = ref('');
-const templateValidationMessage = ref('');
-const templateCopySource = ref('');
 
 const selectedApplicationId = ref(null);
 const selectedGroupId = ref(null);
-const selectedApplicationForUpload = ref('');
-const newApplicationName = ref('');
+const applicationInput = ref('');
 const selectedGroupForUpload = ref('');
 const selectedTemplateId = ref('');
 const taskSearch = ref('');
@@ -421,13 +418,16 @@ const currentGroups = computed(() => {
   return buildFlattenedGroups(selectedApplication.value.groups || []);
 });
 
+const matchedUploadApplication = computed(() => {
+  const name = applicationInput.value.trim();
+  if (!name) return null;
+  return applications.value.find((app) => app.name === name) || null;
+});
+
 const uploadGroups = computed(() => {
-  if (newApplicationName.value.trim()) return [];
-  if (!selectedApplicationForUpload.value) return [];
-  const appId = Number(selectedApplicationForUpload.value);
-  const app = applications.value.find((item) => item.id === appId);
-  if (!app) return [];
-  return buildFlattenedGroups(app.groups || []);
+  const match = matchedUploadApplication.value;
+  if (!match) return [];
+  return buildFlattenedGroups(match.groups || []);
 });
 
 const editorGroups = computed(() => {
@@ -454,7 +454,6 @@ const contextOptions = computed(() => {
 });
 
 const templateLabel = (template) => `${template.name} · ${template.language.toUpperCase()}`;
-const templatesByLanguage = (language) => templates.value.filter((tpl) => tpl.language === language);
 
 const getStatusLabel = (status) => statusLabels[status] || status;
 
@@ -465,132 +464,6 @@ const ensureTemplateSelections = () => {
   if (taskEditor.template_id && !templates.value.some((tpl) => String(tpl.id) === taskEditor.template_id)) {
     taskEditor.template_id = '';
   }
-  if (templateCopySource.value && !templates.value.some((tpl) => String(tpl.id) === templateCopySource.value)) {
-    templateCopySource.value = '';
-  }
-};
-
-const populateTemplateEditor = (template, preserveMessages = false) => {
-  templateEditor.id = String(template.id);
-  templateEditor.name = template.name;
-  templateEditor.language = template.language;
-  templateEditor.content = template.content || '';
-  templateEditor.is_system = !!template.is_system;
-  templateCopySource.value = '';
-  if (!preserveMessages) {
-    templateEditorMessage.value = '';
-    templateValidationMessage.value = '';
-  }
-};
-
-const selectTemplateForEditing = (template) => {
-  populateTemplateEditor(template, false);
-};
-
-const startNewTemplate = (language = 'java') => {
-  templateEditor.id = '';
-  templateEditor.name = '';
-  templateEditor.language = language;
-  templateEditor.content = '';
-  templateEditor.is_system = false;
-  templateCopySource.value = '';
-  templateEditorMessage.value = '';
-  templateValidationMessage.value = '';
-};
-
-const applyTemplateCopy = () => {
-  if (!templateCopySource.value) return;
-  const source = templates.value.find((tpl) => String(tpl.id) === templateCopySource.value);
-  if (source) {
-    templateEditor.language = source.language;
-    templateEditor.content = source.content || '';
-    if (!templateEditor.name) {
-      templateEditor.name = `${source.name} 副本`;
-    }
-  }
-};
-
-const validateTemplate = async () => {
-  templateValidationMessage.value = '';
-  try {
-    const { data } = await axios.post('/api/templates/validate', { content: templateEditor.content });
-    if (data.valid) {
-      templateValidationMessage.value = '格式检查通过。';
-    } else {
-      templateValidationMessage.value = `缺少占位符：${data.missing.join('、')}`;
-    }
-  } catch (err) {
-    templateValidationMessage.value = err.response?.data?.message || '无法进行格式检查。';
-  }
-};
-
-const saveTemplate = async () => {
-  if (templateEditor.is_system) {
-    templateEditorMessage.value = '系统模板不可修改。';
-    return;
-  }
-  if (!templateEditor.name.trim()) {
-    templateEditorMessage.value = '模板名称不能为空。';
-    return;
-  }
-  try {
-    const { data } = await axios.post('/api/templates/validate', { content: templateEditor.content });
-    if (data.valid) {
-      templateValidationMessage.value = '格式检查通过。';
-    } else {
-      templateValidationMessage.value = `缺少占位符：${data.missing.join('、')}`;
-      templateEditorMessage.value = '格式检查未通过，无法保存。';
-      return;
-    }
-  } catch (err) {
-    templateValidationMessage.value = err.response?.data?.message || '无法进行格式检查。';
-    templateEditorMessage.value = '请稍后再试。';
-    return;
-  }
-  const payload = {
-    name: templateEditor.name.trim(),
-    language: templateEditor.language,
-    content: templateEditor.content
-  };
-  try {
-    if (templateEditor.id) {
-      const { data } = await axios.patch(`/api/templates/${templateEditor.id}`, payload);
-      templateEditorMessage.value = '模板已保存。';
-      await fetchTemplates();
-      ensureTemplateSelections();
-      const refreshed = templates.value.find((tpl) => tpl.id === data.id);
-      if (refreshed) {
-        populateTemplateEditor(refreshed, true);
-      }
-    } else {
-      const { data } = await axios.post('/api/templates', payload);
-      templateEditorMessage.value = '模板已创建。';
-      await fetchTemplates();
-      ensureTemplateSelections();
-      const refreshed = templates.value.find((tpl) => tpl.id === data.id);
-      if (refreshed) {
-        populateTemplateEditor(refreshed, true);
-      }
-    }
-  } catch (err) {
-    templateEditorMessage.value = err.response?.data?.message || '保存模板失败。';
-  }
-};
-
-const deleteTemplate = async () => {
-  if (!templateEditor.id || templateEditor.is_system) return;
-  const confirmed = window.confirm('删除模板将影响关联任务，是否继续？');
-  if (!confirmed) return;
-  try {
-    const previousLanguage = templateEditor.language;
-    await axios.delete(`/api/templates/${templateEditor.id}`);
-    templateEditorMessage.value = '模板已删除。';
-    await fetchTemplates();
-    ensureTemplateSelections();
-    startNewTemplate(previousLanguage);
-  } catch (err) {
-    templateEditorMessage.value = err.response?.data?.message || '无法删除模板。';
-  }
 };
 
 const fetchApplications = async () => {
@@ -598,11 +471,11 @@ const fetchApplications = async () => {
   applications.value = data;
   if (applications.value.length === 0) {
     selectedApplicationId.value = null;
-  } else if (!applications.value.some((app) => app.id === selectedApplicationId.value)) {
+  } else if (
+    selectedApplicationId.value &&
+    !applications.value.some((app) => app.id === selectedApplicationId.value)
+  ) {
     selectedApplicationId.value = applications.value[0].id;
-  }
-  if (!selectedApplicationForUpload.value && applications.value.length) {
-    selectedApplicationForUpload.value = String(applications.value[0].id);
   }
   if (selectedGroupId.value) {
     const exists = applications.value.some((app) => hasGroup(app.groups || [], selectedGroupId.value));
@@ -620,18 +493,6 @@ const fetchTemplates = async () => {
     selectedTemplateId.value = systemJava ? String(systemJava.id) : String(templates.value[0].id);
   }
   ensureTemplateSelections();
-  if (templateEditor.id) {
-    const current = templates.value.find((tpl) => String(tpl.id) === templateEditor.id);
-    if (current) {
-      populateTemplateEditor(current, true);
-    } else {
-      startNewTemplate(templateEditor.language);
-    }
-  } else if (!templates.value.length) {
-    startNewTemplate('java');
-  } else {
-    populateTemplateEditor(templates.value[0], false);
-  }
 };
 
 const fetchTasks = async () => {
@@ -793,13 +654,7 @@ const handleFile = (event) => {
   file.value = selected || null;
 };
 
-watch(newApplicationName, () => {
-  if (newApplicationName.value.trim()) {
-    selectedGroupForUpload.value = '';
-  }
-});
-
-watch(selectedApplicationForUpload, () => {
+watch(applicationInput, () => {
   selectedGroupForUpload.value = '';
 });
 
@@ -811,12 +666,14 @@ const submitTask = async () => {
     const formData = new FormData();
     formData.append('image', file.value);
     formData.append('title', title.value);
-    if (newApplicationName.value.trim()) {
-      formData.append('application_name', newApplicationName.value.trim());
-    } else if (selectedApplicationForUpload.value) {
-      formData.append('application_id', selectedApplicationForUpload.value);
+    const match = matchedUploadApplication.value;
+    const trimmedName = applicationInput.value.trim();
+    if (match) {
+      formData.append('application_id', String(match.id));
+    } else if (trimmedName) {
+      formData.append('application_name', trimmedName);
     }
-    if (selectedGroupForUpload.value && !newApplicationName.value.trim()) {
+    if (selectedGroupForUpload.value && match) {
       formData.append('group_id', selectedGroupForUpload.value);
     }
     if (selectedTemplateId.value) {
@@ -826,7 +683,16 @@ const submitTask = async () => {
     uploadMessage.value = '任务已创建，后台将继续处理。';
     title.value = '';
     file.value = null;
-    await refreshTasks();
+    if (!match && trimmedName) {
+      applicationInput.value = trimmedName;
+    } else if (match) {
+      applicationInput.value = match.name;
+    } else {
+      applicationInput.value = '';
+    }
+    selectedGroupForUpload.value = '';
+    selectedTemplateId.value = '';
+    await Promise.all([refreshTasks(), refreshGroups()]);
   } catch (err) {
     uploadMessage.value = err.response?.data?.message || '无法创建任务。';
   } finally {
@@ -1160,6 +1026,15 @@ onBeforeUnmount(() => {
   gap: 8px;
   font-weight: 600;
   color: #243b53;
+}
+
+.combo-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.combo-field input {
+  width: 100%;
 }
 
 .field-grid input,

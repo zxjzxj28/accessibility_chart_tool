@@ -20,10 +20,15 @@ def validate_template_content(content: str) -> List[str]:
 
 
 def render_template_for_task(template: CodeTemplate, task: ChartTask) -> str:
-    base_code = task.java_code if template.language == "java" else task.kotlin_code
-    if not base_code:
-        if task.language == template.language and task.generated_code:
-            base_code = task.generated_code
+    result = task.result
+    if not result:
+        raise ValueError("任务结果尚未准备好，无法渲染模板。")
+    if not result.is_success:
+        raise ValueError("任务生成失败，无法渲染模板。")
+
+    base_code = result.java_code if template.language == "java" else result.kotlin_code
+    if not base_code and task.language == template.language and result.generated_code:
+        base_code = result.generated_code
     if not base_code:
         raise ValueError("Task does not have generated code for the requested template language.")
 
@@ -38,11 +43,11 @@ def render_template_for_task(template: CodeTemplate, task: ChartTask) -> str:
 
     context = _SafeTemplateContext(
         title=task.title,
-        summary=task.summary or "",
-        description=task.description or "",
+        summary=(result.summary or "") if result else "",
+        description=(result.description or "") if result else "",
         generated_code=base_code,
-        data_points_json=json.dumps(task.data_points or []),
-        table_data_json=json.dumps(task.table_data or []),
+        data_points_json=json.dumps((result.data_points or []) if result else []),
+        table_data_json=json.dumps((result.table_data or []) if result else []),
         image_url=image_url,
     )
     try:
