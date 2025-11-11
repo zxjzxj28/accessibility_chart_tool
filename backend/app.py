@@ -9,6 +9,7 @@ from .auth import bp as auth_bp
 from .charts import bp as charts_bp
 from .config import get_config
 from .extensions import db, jwt
+from .models import CodeTemplate
 from .tasks import worker
 
 from dotenv import load_dotenv
@@ -27,6 +28,28 @@ def create_app(config_name: str | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        if CodeTemplate.query.filter_by(is_system=True).count() == 0:
+            default_content = (
+                "// ACT 默认模版\n"
+                "// 标题：{title}\n"
+                "// 摘要：{summary}\n\n"
+                "{generated_code}\n"
+            )
+            java_template = CodeTemplate(
+                name="默认模板 (Java)",
+                language="java",
+                content=default_content,
+                is_system=True,
+            )
+            kotlin_template = CodeTemplate(
+                name="默认模板 (Kotlin)",
+                language="kotlin",
+                content=default_content,
+                is_system=True,
+            )
+            db.session.add(java_template)
+            db.session.add(kotlin_template)
+            db.session.commit()
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(charts_bp)

@@ -46,7 +46,7 @@
         <header class="card-header">
           <div>
             <h2>Android 代码片段</h2>
-            <p class="muted">为当前语言调优代码，保存后即可在下载包中获取自定义版本。</p>
+            <p class="muted">在模板和语言之间切换，必要时保存自定义代码。</p>
           </div>
           <div class="button-group">
             <div class="language-tabs">
@@ -61,11 +61,18 @@
                 @click="switchLanguage('kotlin')"
               >Kotlin</button>
             </div>
+            <select class="template-select" v-model="selectedTemplates[activeLanguage]" @change="onTemplateChange">
+              <option value="">原始生成代码</option>
+              <option v-for="template in templatesByLanguage(activeLanguage)" :key="template.id" :value="String(template.id)">
+                {{ templateLabel(template) }}
+              </option>
+            </select>
             <button class="ghost" @click="resetToGenerated">恢复生成代码</button>
             <button class="primary" @click="saveCustomCode">保存自定义代码</button>
           </div>
         </header>
         <textarea v-model="editedCode" spellcheck="false"></textarea>
+        <p v-if="templateMessage" class="info">{{ templateMessage }}</p>
         <p v-if="saveMessage" class="info">{{ saveMessage }}</p>
       </article>
       <article class="card integration-card">
@@ -99,7 +106,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
@@ -112,22 +119,60 @@ const activeLanguage = ref('java');
 const regenerating = ref(false);
 const saveMessage = ref('');
 const downloadMessage = ref('');
+const templateMessage = ref('');
+const templates = ref([]);
+
+const selectedTemplates = reactive({ java: '', kotlin: '' });
+const templateCache = reactive({ java: new Map(), kotlin: new Map() });
 
 const statusLabels = {
   pending: '排队中',
   processing: '处理中',
   completed: '已完成',
   failed: '失败',
-  cancelled: '已取消',
+  cancelled: '已取消'
 };
 
 const taskId = route.params.id;
 
+const fetchTemplates = async () => {
+  const { data } = await axios.get('/api/templates');
+  templates.value = data.items;
+};
+
+const templateLabel = (template) => `${template.name} · ${template.language.toUpperCase()}`;
+
+const templatesByLanguage = (language) => templates.value.filter((tpl) => tpl.language === language);
+
+const clearTemplateCache = () => {
+  templateCache.java.clear();
+  templateCache.kotlin.clear();
+};
+
 const fetchTask = async () => {
   const { data } = await axios.get(`/api/tasks/${taskId}`);
   task.value = data;
-  activeLanguage.value = data.language || 'java';
-  applyLanguageCode();
+  activeLanguage.value = data.template?.language || data.language || 'java';
+  initializeTemplateSelection();
+  await applyLanguageCode();
+};
+
+const initializeTemplateSelection = () => {
+  if (!task.value) return;
+  clearTemplateCache();
+  selectedTemplates.java = '';
+  selectedTemplates.kotlin = '';
+  if (task.value.template && task.value.template.language) {
+    selectedTemplates[task.value.template.language] = String(task.value.template.id);
+  }
+  const systemJava = templatesByLanguage('java').find((tpl) => tpl.is_system) || templatesByLanguage('java')[0];
+  const systemKotlin = templatesByLanguage('kotlin').find((tpl) => tpl.is_system) || templatesByLanguage('kotlin')[0];
+  if (!selectedTemplates.java && systemJava) {
+    selectedTemplates.java = String(systemJava.id);
+  }
+  if (!selectedTemplates.kotlin && systemKotlin) {
+    selectedTemplates.kotlin = String(systemKotlin.id);
+  }
 };
 
 const refresh = async () => {
@@ -162,8 +207,9 @@ const regenerateCode = async () => {
 };
 
 const resetToGenerated = () => {
-  const base = getBaseCode(activeLanguage.value);
-  editedCode.value = base;
+  selectedTemplates[activeLanguage.value] = '';
+  editedCode.value = getBaseCode(activeLanguage.value);
+  templateMessage.value = '';
 };
 
 const goBack = () => {
@@ -179,26 +225,114 @@ const imageSource = computed(() => task.value?.image_url || '');
 
 const getBaseCode = (language) => {
   if (!task.value) return '';
-  const base = language === 'java' ? task.value.java_code : task.value.kotlin_code;
+  if (language === 'java') {
+    return task.value.java_code || '';
+  }
+  return task.value.kotlin_code || '';
+};
+
+const applyLanguageCode = async () => {
+  if (!task.value) return;
+  templateMessage.value = '';
+  const language = activeLanguage.value;
   const custom = task.value.custom_code?.[language];
-  return custom || base || '';
+  if (custom) {
+    editedCode.value = custom;
+    return;
+  }
+  const templateId = selectedTemplates[language];
+  if (templateId) {
+    await handleTemplateSelection(language, templateId, true);
+  } else {
+    editedCode.value = getBaseCode(language);
+  }
 };
 
-const applyLanguageCode = () => {
-  editedCode.value = getBaseCode(activeLanguage.value);
+const handleTemplateSelection = async (language, templateId, fromApply = false) => {
+  if (!task.value) return;
+  if (!templateId) {
+    if (activeLanguage.value === language) {
+      editedCode.value = getBaseCode(language);
+    }
+    return;
+  }
+  if (task.value.status !== 'completed') {
+    if (activeLanguage.value === language) {
+      templateMessage.value = '任务尚未完成，无法应用模板。';
+    }
+    return;
+  }
+  const cache = templateCache[language];
+  if (cache.has(templateId)) {
+    if (activeLanguage.value === language) {
+      editedCode.value = cache.get(templateId);
+    }
+    return;
+  }
+  try {
+    const { data } = await axios.post(`/api/tasks/${taskId}/render-template`, { template_id: Number(templateId) });
+    cache.set(templateId, data.code);
+    if (activeLanguage.value === language) {
+      editedCode.value = data.code;
+      if (!fromApply) {
+        templateMessage.value = '';
+      }
+    }
+  } catch (err) {
+    const message = err.response?.data?.message || '模板渲染失败。';
+    if (activeLanguage.value === language) {
+      templateMessage.value = message;
+      editedCode.value = getBaseCode(language);
+    }
+  }
 };
 
-const switchLanguage = (language) => {
+const onTemplateChange = async () => {
+  await applyLanguageCode();
+};
+
+const switchLanguage = async (language) => {
   if (activeLanguage.value === language) return;
   activeLanguage.value = language;
-  applyLanguageCode();
+  await applyLanguageCode();
   saveMessage.value = '';
 };
 
 watch(
   () => task.value?.custom_code,
-  () => {
-    applyLanguageCode();
+  async () => {
+    await applyLanguageCode();
+  }
+);
+
+watch(
+  () => activeLanguage.value,
+  async () => {
+    await applyLanguageCode();
+  }
+);
+
+watch(
+  () => selectedTemplates.java,
+  async () => {
+    if (!task.value) return;
+    if (activeLanguage.value === 'java') {
+      await applyLanguageCode();
+    } else if (selectedTemplates.java) {
+      await handleTemplateSelection('java', selectedTemplates.java);
+    }
+  }
+);
+
+watch(
+  () => selectedTemplates.kotlin,
+  async () => {
+    if (!task.value) return;
+    if (activeLanguage.value === 'kotlin') {
+      await applyLanguageCode();
+    } else if (selectedTemplates.kotlin) {
+      await handleTemplateSelection('kotlin', selectedTemplates.kotlin);
+    }
   }
 );
 
@@ -219,7 +353,8 @@ const downloadPackage = async () => {
 };
 
 onMounted(async () => {
-  await refresh();
+  await fetchTemplates();
+  await fetchTask();
 });
 </script>
 
@@ -273,12 +408,14 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  align-items: center;
 }
 
 .button-group {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .card-header h2 {
@@ -320,6 +457,15 @@ textarea {
   background: linear-gradient(135deg, #4c6ef5, #5f3dc4);
   color: white;
   border-color: #4c6ef5;
+}
+
+.template-select {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #d9e2ec;
+  background: #f8fafc;
+  color: #364fc7;
+  font-weight: 600;
 }
 
 .integration-card {
@@ -398,47 +544,24 @@ button.primary {
 }
 
 button.secondary {
-  background: #edf2ff;
-  color: #364fc7;
+  background: #f1f5f9;
+  color: #3b5bdb;
 }
 
 button.ghost {
-  background: transparent;
-  color: #334e68;
+  background: #f8fafc;
+  color: #486581;
 }
 
-button:hover {
+button.primary:hover,
+button.secondary:hover,
+button.ghost:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.1);
-}
-
-.image-preview img {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid #d9e2ec;
-}
-
-.table {
-  width: 100%;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-td,
-th {
-  text-align: left;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e5e9f2;
 }
 
 .loading-state {
-  display: grid;
-  place-items: center;
-  min-height: 60vh;
-  font-size: 1.2rem;
-  color: #829ab1;
+  padding: 32px;
+  text-align: center;
+  color: #486581;
 }
 </style>

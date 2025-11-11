@@ -20,8 +20,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    applications = db.relationship("ChartApplication", backref="user", lazy=True)
     groups = db.relationship("ChartGroup", backref="user", lazy=True)
     tasks = db.relationship("ChartTask", backref="user", lazy=True)
+    templates = db.relationship("CodeTemplate", backref="owner", lazy=True)
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -39,12 +41,48 @@ class User(db.Model):
         }
 
 
+class ChartApplication(db.Model):
+    __tablename__ = "chart_applications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_chart_app_user_name"),
+    )
+
+    groups = db.relationship(
+        "ChartGroup",
+        backref="application",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    tasks = db.relationship(
+        "ChartTask",
+        backref="application",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 class ChartGroup(db.Model):
     __tablename__ = "chart_groups"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    application_id = db.Column(
+        db.Integer, db.ForeignKey("chart_applications.id"), nullable=False
+    )
     parent_id = db.Column(db.Integer, db.ForeignKey("chart_groups.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -54,12 +92,18 @@ class ChartGroup(db.Model):
         backref=db.backref("parent", remote_side=[id]),
         lazy=True,
     )
-    tasks = db.relationship("ChartTask", backref="group", lazy=True)
+    tasks = db.relationship(
+        "ChartTask",
+        backref="group",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
+            "application_id": self.application_id,
             "parent_id": self.parent_id,
             "created_at": self.created_at.isoformat(),
         }
@@ -73,8 +117,91 @@ class ChartTask(db.Model):
     status = db.Column(db.String(50), default="pending")
     language = db.Column(db.String(20), default="java")
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    application_id = db.Column(
+        db.Integer, db.ForeignKey("chart_applications.id"), nullable=False
+    )
     group_id = db.Column(db.Integer, db.ForeignKey("chart_groups.id"), nullable=True)
     image_path = db.Column(db.String(500), nullable=True)
+    template_id = db.Column(db.Integer, db.ForeignKey("code_templates.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    result = db.relationship(
+        "ChartTaskResult",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        lazy=True,
+        uselist=False,
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        from flask import url_for
+
+        image_url = (
+            url_for("charts.serve_upload", filename=self.image_path, _external=True)
+            if self.image_path
+            else None
+        )
+
+        result_payload = self.result.to_dict() if self.result else None
+
+        data: dict[str, Any] = {
+            "id": self.id,
+            "title": self.title,
+            "status": self.status,
+            "language": self.language,
+            "application_id": self.application_id,
+            "group_id": self.group_id,
+            "application": self.application.to_dict() if self.application else None,
+            "image_path": self.image_path,
+            "image_url": image_url,
+            "template_id": self.template_id,
+            "template": self.template.to_dict() if self.template else None,
+            "result": result_payload,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+        if result_payload:
+            data.update(
+                {
+                    "summary": result_payload.get("summary"),
+                    "description": result_payload.get("description"),
+                    "data_points": result_payload.get("data_points", []),
+                    "table_data": result_payload.get("table_data", []),
+                    "generated_code": result_payload.get("generated_code"),
+                    "java_code": result_payload.get("java_code"),
+                    "kotlin_code": result_payload.get("kotlin_code"),
+                    "integration_doc": result_payload.get("integration_doc", {}),
+                    "custom_code": result_payload.get("custom_code"),
+                    "error_message": result_payload.get("error_message"),
+                }
+            )
+        else:
+            data.update(
+                {
+                    "summary": None,
+                    "description": None,
+                    "data_points": [],
+                    "table_data": [],
+                    "generated_code": None,
+                    "java_code": None,
+                    "kotlin_code": None,
+                    "integration_doc": {},
+                    "custom_code": None,
+                    "error_message": None,
+                }
+            )
+
+        return data
+
+
+class ChartTaskResult(db.Model):
+    __tablename__ = "chart_task_results"
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("chart_tasks.id"), nullable=False, unique=True)
+    is_success = db.Column(db.Boolean, default=False)
     summary = db.Column(db.Text, nullable=True)
     description = db.Column(db.Text, nullable=True)
     data_points = db.Column(db.JSON, nullable=True)
@@ -88,15 +215,9 @@ class ChartTask(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    task = db.relationship("ChartTask", back_populates="result", lazy=True)
+
     def to_dict(self) -> dict[str, Any]:
-        from flask import url_for
-
-        image_url = (
-            url_for("charts.serve_upload", filename=self.image_path, _external=True)
-            if self.image_path
-            else None
-        )
-
         custom_payload: Any = None
         if self.custom_code:
             try:
@@ -105,13 +226,8 @@ class ChartTask(db.Model):
                 custom_payload = {"legacy": self.custom_code}
 
         return {
-            "id": self.id,
-            "title": self.title,
-            "status": self.status,
-            "language": self.language,
-            "group_id": self.group_id,
-            "image_path": self.image_path,
-            "image_url": image_url,
+            "task_id": self.task_id,
+            "is_success": bool(self.is_success),
             "summary": self.summary,
             "description": self.description,
             "data_points": self.data_points or [],
@@ -122,6 +238,39 @@ class ChartTask(db.Model):
             "integration_doc": self.integration_doc or {},
             "custom_code": custom_payload,
             "error_message": self.error_message,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class CodeTemplate(db.Model):
+    __tablename__ = "code_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    language = db.Column(db.String(20), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    is_system = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "language IN ('java', 'kotlin')",
+            name="ck_code_templates_language",
+        ),
+    )
+
+    tasks = db.relationship("ChartTask", backref="template", lazy=True)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "language": self.language,
+            "content": self.content,
+            "is_system": self.is_system,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
