@@ -20,8 +20,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    applications = db.relationship("ChartApplication", backref="user", lazy=True)
     groups = db.relationship("ChartGroup", backref="user", lazy=True)
     tasks = db.relationship("ChartTask", backref="user", lazy=True)
+    templates = db.relationship("CodeTemplate", backref="owner", lazy=True)
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -39,12 +41,48 @@ class User(db.Model):
         }
 
 
+class ChartApplication(db.Model):
+    __tablename__ = "chart_applications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_chart_app_user_name"),
+    )
+
+    groups = db.relationship(
+        "ChartGroup",
+        backref="application",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    tasks = db.relationship(
+        "ChartTask",
+        backref="application",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 class ChartGroup(db.Model):
     __tablename__ = "chart_groups"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    application_id = db.Column(
+        db.Integer, db.ForeignKey("chart_applications.id"), nullable=False
+    )
     parent_id = db.Column(db.Integer, db.ForeignKey("chart_groups.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -54,12 +92,18 @@ class ChartGroup(db.Model):
         backref=db.backref("parent", remote_side=[id]),
         lazy=True,
     )
-    tasks = db.relationship("ChartTask", backref="group", lazy=True)
+    tasks = db.relationship(
+        "ChartTask",
+        backref="group",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
+            "application_id": self.application_id,
             "parent_id": self.parent_id,
             "created_at": self.created_at.isoformat(),
         }
@@ -73,6 +117,9 @@ class ChartTask(db.Model):
     status = db.Column(db.String(50), default="pending")
     language = db.Column(db.String(20), default="java")
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    application_id = db.Column(
+        db.Integer, db.ForeignKey("chart_applications.id"), nullable=False
+    )
     group_id = db.Column(db.Integer, db.ForeignKey("chart_groups.id"), nullable=True)
     image_path = db.Column(db.String(500), nullable=True)
     summary = db.Column(db.Text, nullable=True)
@@ -85,6 +132,7 @@ class ChartTask(db.Model):
     integration_doc = db.Column(db.JSON, nullable=True)
     custom_code = db.Column(db.Text, nullable=True)
     error_message = db.Column(db.Text, nullable=True)
+    template_id = db.Column(db.Integer, db.ForeignKey("code_templates.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -109,7 +157,9 @@ class ChartTask(db.Model):
             "title": self.title,
             "status": self.status,
             "language": self.language,
+            "application_id": self.application_id,
             "group_id": self.group_id,
+            "application": self.application.to_dict() if self.application else None,
             "image_path": self.image_path,
             "image_url": image_url,
             "summary": self.summary,
@@ -122,6 +172,41 @@ class ChartTask(db.Model):
             "integration_doc": self.integration_doc or {},
             "custom_code": custom_payload,
             "error_message": self.error_message,
+            "template_id": self.template_id,
+            "template": self.template.to_dict() if self.template else None,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class CodeTemplate(db.Model):
+    __tablename__ = "code_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    language = db.Column(db.String(20), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    is_system = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "language IN ('java', 'kotlin')",
+            name="ck_code_templates_language",
+        ),
+    )
+
+    tasks = db.relationship("ChartTask", backref="template", lazy=True)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "language": self.language,
+            "content": self.content,
+            "is_system": self.is_system,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
