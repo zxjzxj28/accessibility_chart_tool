@@ -140,12 +140,24 @@ def update_group(group_id: int):
     payload = request.get_json() or {}
     name = payload.get("name")
     parent_id = payload.get("parent_id")
+    application_id = payload.get("application_id")
 
     if name is not None:
         name = name.strip()
         if not name:
             return jsonify({"message": "分组名称不能为空"}), 400
         group.name = name
+
+    if application_id is not None:
+        application = (
+            ChartApplication.query.filter_by(id=int(application_id), user_id=user_id)
+            .first()
+        )
+        if not application:
+            return jsonify({"message": "Application not found."}), 404
+        group.application = application
+        if group.parent and group.parent.application_id != group.application_id:
+            group.parent = None
 
     if parent_id is not None:
         if parent_id == group.id:
@@ -320,12 +332,13 @@ def list_tasks():
 
     return jsonify(
         {
-            "items": [task.to_dict() for task in pagination.items],
+            "items": items,
             "page": pagination.page,
             "pages": pagination.pages,
             "total": pagination.total,
         }
     )
+
 
 
 @bp.post("/tasks")
