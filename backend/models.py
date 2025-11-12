@@ -125,6 +125,7 @@ class ChartTask(db.Model):
     template_id = db.Column(db.Integer, db.ForeignKey("code_templates.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ended_at = db.Column(db.DateTime, nullable=True)
     is_deleted = db.Column(db.Boolean, default=False)
 
     result = db.relationship(
@@ -156,7 +157,6 @@ class ChartTask(db.Model):
             "status": self.status,
             "user_id": self.user_id,
             "app_id": self.app_id,
-            "group_id": self.group_id,
             "application": self.application.to_dict() if self.application else None,
             "group": self.group.to_dict() if self.group else None,
             "image_path": self.image_path,
@@ -166,6 +166,7 @@ class ChartTask(db.Model):
             "result": result_payload,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "ended_at": self.ended_at.isoformat() if self.ended_at else None,
             "is_deleted": self.is_deleted,
             "summary": result_data.get("summary"),
             "data_points": result_data.get("data_points", []),

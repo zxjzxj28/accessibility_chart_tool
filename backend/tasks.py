@@ -2,6 +2,7 @@ from __future__ import annotations
 import queue
 import threading
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from flask import Flask
@@ -9,7 +10,6 @@ from flask import Flask
 from .extensions import db
 from .models import ChartTask, ChartTaskResult
 from .utils.chart_processing import process_chart
-from .utils.template_engine import render_template_for_task
 
 
 @dataclass
@@ -46,6 +46,7 @@ class ChartProcessingWorker:
                         continue
 
                     task.status = "processing"
+                    task.ended_at = None
                     db.session.commit()
 
                     result_payload = process_chart(
@@ -63,6 +64,7 @@ class ChartProcessingWorker:
                     task_result.error_message = None
 
                     task.status = "completed"
+                    task.ended_at = datetime.utcnow()
                     db.session.commit()
                 except Exception as exc:  # pragma: no cover - defensive logging
                     task = ChartTask.query.get(payload.task_id)
@@ -76,6 +78,7 @@ class ChartProcessingWorker:
                         task_result.summary = None
                         task_result.data_points = None
                         task_result.table_data = None
+                        task.ended_at = datetime.utcnow()
                         db.session.commit()
                 finally:
                     self._queue.task_done()
