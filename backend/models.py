@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from flask import url_for
+
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db
@@ -123,6 +125,7 @@ class ChartTask(db.Model):
     template_id = db.Column(db.Integer, db.ForeignKey("code_templates.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ended_at = db.Column(db.DateTime, nullable=True)
     is_deleted = db.Column(db.Boolean, default=False)
 
     result = db.relationship(
@@ -133,21 +136,17 @@ class ChartTask(db.Model):
         uselist=False,
     )
 
-    result = db.relationship(
-        "ChartTaskResult",
-        back_populates="task",
-        cascade="all, delete-orphan",
-        lazy=True,
-        uselist=False,
-    )
-
-    result = db.relationship(
-        "ChartTaskResult",
-        back_populates="task",
-        cascade="all, delete-orphan",
-        lazy=True,
-        uselist=False,
-    )
+    def to_dict(self) -> dict[str, Any]:
+        image_url = None
+        if self.image_path:
+            try:
+                image_url = url_for(
+                    "charts.serve_upload",
+                    filename=self.image_path,
+                    _external=True,
+                )
+            except RuntimeError:  # pragma: no cover - outside request context
+                image_url = f"/api/uploads/{self.image_path}"
 
         result_payload = self.result.to_dict() if self.result else None
         result_data: dict[str, Any] = result_payload or {}
@@ -156,8 +155,8 @@ class ChartTask(db.Model):
             "id": self.id,
             "title": self.title,
             "status": self.status,
+            "user_id": self.user_id,
             "app_id": self.app_id,
-            "group_id": self.group_id,
             "application": self.application.to_dict() if self.application else None,
             "image_path": self.image_path,
             "image_url": image_url,
@@ -166,6 +165,7 @@ class ChartTask(db.Model):
             "result": result_payload,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "ended_at": self.ended_at.isoformat() if self.ended_at else None,
             "is_deleted": self.is_deleted,
             "summary": result_data.get("summary"),
             "data_points": result_data.get("data_points", []),
