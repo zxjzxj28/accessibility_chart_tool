@@ -141,7 +141,13 @@ class ChartTask(db.Model):
         uselist=False,
     )
 
-    task = db.relationship("ChartTask", back_populates="result", lazy=True)
+    result = db.relationship(
+        "ChartTaskResult",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        lazy=True,
+        uselist=False,
+    )
 
         result_payload = self.result.to_dict() if self.result else None
         result_data: dict[str, Any] = result_payload or {}
