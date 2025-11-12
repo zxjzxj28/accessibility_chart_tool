@@ -7,7 +7,7 @@ from typing import Optional
 from flask import Flask
 
 from .extensions import db
-from .models import ChartTask
+from .models import ChartTask, ChartTaskResult
 from .utils.chart_processing import process_chart
 
 
@@ -47,27 +47,34 @@ class ChartProcessingWorker:
                     task.status = "processing"
                     db.session.commit()
 
-                    result = process_chart(payload.image_path, payload.public_image_url)
+                    result_payload = process_chart(
+                        payload.image_path, payload.public_image_url
+                    )
 
-                    task.summary = result.get("summary")
-                    task.description = result.get("description")
-                    task.data_points = result.get("data_points")
-                    task.table_data = result.get("table_data")
-                    task.generated_code = result.get("generated_code")
-                    task.java_code = result.get("java_code")
-                    task.kotlin_code = result.get("kotlin_code")
-                    task.integration_doc = result.get("integration_doc")
-                    if task.language == "java" and task.java_code:
-                        task.generated_code = task.java_code
-                    elif task.language == "kotlin" and task.kotlin_code:
-                        task.generated_code = task.kotlin_code
+                    task_result = task.result or ChartTaskResult(task=task)
+                    if task.result is None:
+                        db.session.add(task_result)
+
+                    task_result.is_success = True
+                    task_result.summary = result_payload.get("summary")
+                    task_result.data_points = result_payload.get("data_points")
+                    task_result.table_data = result_payload.get("table_data")
+                    task_result.error_message = None
+
                     task.status = "completed"
                     db.session.commit()
                 except Exception as exc:  # pragma: no cover - defensive logging
                     task = ChartTask.query.get(payload.task_id)
                     if task:
                         task.status = "failed"
-                        task.error_message = str(exc)
+                        task_result = task.result or ChartTaskResult(task=task)
+                        if task.result is None:
+                            db.session.add(task_result)
+                        task_result.is_success = False
+                        task_result.error_message = str(exc)
+                        task_result.summary = None
+                        task_result.data_points = None
+                        task_result.table_data = None
                         db.session.commit()
                 finally:
                     self._queue.task_done()

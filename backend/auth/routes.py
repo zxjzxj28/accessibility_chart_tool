@@ -11,12 +11,11 @@ from . import bp
 @bp.post("/register")
 def register():
     payload = request.get_json() or {}
-    name = (payload.get("name") or "").strip()
     email = (payload.get("email") or "").lower().strip()
     username = (payload.get("username") or "").strip()
     password = payload.get("password")
 
-    if not all([name, email, username, password]):
+    if not all([email, username, password]):
         return jsonify({"message": "Missing required fields."}), 400
 
     if User.query.filter_by(email=email).first():
@@ -25,7 +24,7 @@ def register():
     if User.query.filter_by(username=username).first():
         return jsonify({"message": "Username already registered."}), 400
 
-    user = User(name=name, email=email, username=username)
+    user = User(email=email, username=username)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
