@@ -19,6 +19,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/templates',
+    name: 'templates',
+    component: () => import('../components/TemplateManagementView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/tasks/:id',
     name: 'task-detail',
     component: () => import('../components/TaskDetailView.vue'),
