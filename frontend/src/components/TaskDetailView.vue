@@ -164,6 +164,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  align-items: center;
 }
 
 .summary p {

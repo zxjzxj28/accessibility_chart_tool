@@ -75,6 +75,39 @@ class ChartApplication(db.Model):
         }
 
 
+class ChartApplication(db.Model):
+    __tablename__ = "chart_applications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_chart_app_user_name"),
+    )
+
+    groups = db.relationship(
+        "ChartGroup",
+        backref="application",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    tasks = db.relationship(
+        "ChartTask",
+        backref="application",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 class ChartGroup(db.Model):
     __tablename__ = "chart_groups"
 
@@ -133,14 +166,7 @@ class ChartTask(db.Model):
         uselist=False,
     )
 
-    def to_dict(self) -> dict[str, Any]:
-        from flask import url_for
-
-        image_url = (
-            url_for("charts.serve_upload", filename=self.image_path, _external=True)
-            if self.image_path
-            else None
-        )
+    task = db.relationship("ChartTask", back_populates="result", lazy=True)
 
         result_payload = self.result.to_dict() if self.result else None
 

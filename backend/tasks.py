@@ -9,6 +9,7 @@ from flask import Flask
 from .extensions import db
 from .models import ChartTask, ChartTaskResult
 from .utils.chart_processing import process_chart
+from .utils.template_engine import render_template_for_task
 
 
 @dataclass

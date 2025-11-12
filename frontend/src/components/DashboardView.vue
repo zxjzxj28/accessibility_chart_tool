@@ -488,6 +488,10 @@ const handleFile = (event) => {
   file.value = uploaded || null;
 };
 
+watch(applicationInput, () => {
+  selectedGroupForUpload.value = '';
+});
+
 const submitTask = async () => {
   if (!file.value) {
     uploadMessage.value = '请选择图表图片。';
@@ -549,6 +553,12 @@ const onEditorAppChange = () => {
 const saveEditor = async () => {
   if (!editor.taskId) return;
   try {
+    const applicationId = Number(taskEditor.application_id);
+    if (!applicationId) {
+      taskEditorMessage.value = '请选择应用。';
+      taskEditorLoading.value = false;
+      return;
+    }
     const payload = {
       title: editor.title.trim(),
       app_id: editor.app_id,
@@ -859,7 +869,7 @@ onMounted(async () => {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -880,6 +890,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  justify-content: flex-end;
 }
 
 .dialog-actions {
