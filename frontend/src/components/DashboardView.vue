@@ -646,6 +646,27 @@ watch([selectedAppId, selectedStatus, createdStart, createdEnd, endedStart, ende
   scheduleFilterLoad();
 });
 
+watch(selectedAppId, (value, oldValue) => {
+  if (!value) {
+    selectedGroupId.value = null;
+  } else if (value !== oldValue) {
+    const app = applications.value.find((item) => item.id === value);
+    const groupExists = app?.flattenedGroups.some((group) => group.id === selectedGroupId.value);
+    if (!groupExists) {
+      selectedGroupId.value = null;
+    }
+  }
+  if (value !== oldValue) {
+    scheduleFilterLoad();
+  }
+});
+
+watch(selectedGroupId, (value, oldValue) => {
+  if (value !== oldValue) {
+    scheduleFilterLoad();
+  }
+});
+
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     router.push('/login');
@@ -953,7 +974,6 @@ onMounted(async () => {
 }
 
 .pagination {
-  margin-top: 16px;
   display: flex;
   gap: 16px;
   align-items: center;

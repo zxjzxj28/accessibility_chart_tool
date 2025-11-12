@@ -158,6 +158,7 @@ class ChartTask(db.Model):
             "user_id": self.user_id,
             "app_id": self.app_id,
             "application": self.application.to_dict() if self.application else None,
+            "group": self.group.to_dict() if self.group else None,
             "image_path": self.image_path,
             "image_url": image_url,
             "template_id": self.template_id,
