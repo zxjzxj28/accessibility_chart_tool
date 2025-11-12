@@ -329,6 +329,7 @@ def list_tasks():
         )
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    items = [task.to_dict() for task in pagination.items]
 
     return jsonify(
         {
