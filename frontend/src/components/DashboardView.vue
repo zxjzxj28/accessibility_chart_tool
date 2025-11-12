@@ -613,9 +613,11 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 24px;
-  padding: 24px;
+  padding: 32px 24px 40px;
   min-height: 100vh;
-  background: #f5f6f8;
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 .sidebar {
@@ -627,10 +629,11 @@ onMounted(async () => {
 .user-card,
 .applications,
 .card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(4px);
 }
 
 .user-card h2 {
@@ -819,13 +822,19 @@ onMounted(async () => {
 }
 
 .task-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 16px;
+  padding: 18px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
 }
 
 .task-card header {

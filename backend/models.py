@@ -75,39 +75,6 @@ class ChartApplication(db.Model):
         }
 
 
-class ChartApplication(db.Model):
-    __tablename__ = "chart_applications"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        db.UniqueConstraint("user_id", "name", name="uq_chart_app_user_name"),
-    )
-
-    groups = db.relationship(
-        "ChartGroup",
-        backref="application",
-        cascade="all, delete-orphan",
-        lazy=True,
-    )
-    tasks = db.relationship(
-        "ChartTask",
-        backref="application",
-        cascade="all, delete-orphan",
-        lazy=True,
-    )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "created_at": self.created_at.isoformat(),
-        }
-
-
 class ChartGroup(db.Model):
     __tablename__ = "chart_groups"
 
@@ -166,9 +133,18 @@ class ChartTask(db.Model):
         uselist=False,
     )
 
+    result = db.relationship(
+        "ChartTaskResult",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        lazy=True,
+        uselist=False,
+    )
+
     task = db.relationship("ChartTask", back_populates="result", lazy=True)
 
         result_payload = self.result.to_dict() if self.result else None
+        result_data: dict[str, Any] = result_payload or {}
 
         data: dict[str, Any] = {
             "id": self.id,
@@ -185,27 +161,11 @@ class ChartTask(db.Model):
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "is_deleted": self.is_deleted,
+            "summary": result_data.get("summary"),
+            "data_points": result_data.get("data_points", []),
+            "table_data": result_data.get("table_data", []),
+            "error_message": result_data.get("error_message"),
         }
-
-        if result_payload:
-            data.update(
-                {
-                    "summary": result_payload.get("summary"),
-                    "data_points": result_payload.get("data_points", []),
-                    "table_data": result_payload.get("table_data", []),
-                    "error_message": result_payload.get("error_message"),
-                }
-            )
-        else:
-            data.update(
-                {
-                    "summary": None,
-                    "data_points": [],
-                    "table_data": [],
-                    "error_message": None,
-                }
-            )
-
         return data
 
 
