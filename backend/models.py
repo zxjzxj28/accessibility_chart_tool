@@ -133,14 +133,15 @@ class ChartTask(db.Model):
         uselist=False,
     )
 
-    def to_dict(self) -> dict[str, Any]:
-        from flask import url_for
+    result = db.relationship(
+        "ChartTaskResult",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        lazy=True,
+        uselist=False,
+    )
 
-        image_url = (
-            url_for("charts.serve_upload", filename=self.image_path, _external=True)
-            if self.image_path
-            else None
-        )
+    task = db.relationship("ChartTask", back_populates="result", lazy=True)
 
         result_payload = self.result.to_dict() if self.result else None
         result_data: dict[str, Any] = result_payload or {}
