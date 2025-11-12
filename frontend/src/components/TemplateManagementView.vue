@@ -1,272 +1,191 @@
 <template>
-  <div class="template-page">
+  <div class="templates-page">
     <header class="page-header">
       <div>
-        <h1>代码模板管理</h1>
-        <p>集中维护 Java 与 Kotlin 模版，支持新增、修改、删除与格式检查。</p>
+        <h1>模板管理</h1>
+        <p class="muted">维护 Java / Kotlin 代码模板，保存前会自动检查必需占位符。</p>
       </div>
-      <div class="header-actions">
-        <router-link class="ghost" to="/">← 返回首页</router-link>
-        <button class="primary" @click="startNewTemplate('java')">新建模板</button>
-      </div>
+      <router-link class="ghost" to="/">返回首页</router-link>
     </header>
 
-    <section class="template-layout">
-      <aside class="template-sidebar">
-        <div class="template-group" v-for="lang in ['java', 'kotlin']" :key="`tpl-group-${lang}`">
-          <div class="template-group-header">
-            <h2>{{ lang === 'java' ? 'Java 模板' : 'Kotlin 模板' }}</h2>
-            <button class="icon" @click="startNewTemplate(lang)" title="新增模板">＋</button>
-          </div>
-          <ul>
-            <li v-for="tpl in templatesByLanguage(lang)" :key="`tpl-list-${tpl.id}`">
-              <button
-                type="button"
-                :class="{ active: templateEditor.id === String(tpl.id) }"
-                @click="selectTemplateForEditing(tpl)"
-              >
-                {{ tpl.name }}
-                <span v-if="tpl.is_system" class="tag">系统</span>
-              </button>
-            </li>
-            <li v-if="!templatesByLanguage(lang).length" class="empty">暂无模板</li>
-          </ul>
-        </div>
-      </aside>
-
-      <div class="template-editor">
-        <form @submit.prevent="saveTemplate" class="template-form">
-          <div class="editor-row">
-            <label>
-              模板名称
-              <input v-model="templateEditor.name" type="text" :disabled="templateEditor.is_system" required />
-            </label>
-            <label>
-              代码语言
-              <select v-model="templateEditor.language" :disabled="templateEditor.id && templateEditor.is_system">
-                <option value="java">Java</option>
-                <option value="kotlin">Kotlin</option>
-              </select>
-            </label>
-          </div>
-
-          <label class="copy-control">
-            从现有模板填充
-            <div class="copy-actions">
-              <select v-model="templateCopySource">
-                <option value="">选择模板</option>
-                <option
-                  v-for="tpl in templatesByLanguage(templateEditor.language)"
-                  :key="`tpl-copy-${tpl.id}`"
-                  :value="String(tpl.id)"
-                >
-                  {{ tpl.name }}
-                </option>
-              </select>
-              <button type="button" class="ghost" @click="applyTemplateCopy" :disabled="!templateCopySource">填充</button>
-            </div>
-          </label>
-
-          <label>
-            模板内容
-            <textarea v-model="templateEditor.content" :readonly="templateEditor.is_system"></textarea>
-          </label>
-
-          <div class="placeholder-hint">
-            <strong>必需占位符：</strong>
-            <span v-if="requiredPlaceholders.length">{{ requiredPlaceholders.join('、') }}</span>
-            <span v-else>正在加载...</span>
-          </div>
-
-          <div class="template-actions">
-            <button type="button" class="ghost" @click="validateTemplate" :disabled="templateEditor.is_system">格式检查</button>
-            <button type="submit" class="primary" :disabled="templateEditor.is_system">保存模板</button>
-            <button type="button" class="secondary" @click="deleteTemplate" :disabled="!templateEditor.id || templateEditor.is_system">删除模板</button>
-          </div>
-
-          <p v-if="templateValidationMessage" class="info">{{ templateValidationMessage }}</p>
-          <p v-if="templateEditorMessage" class="info">{{ templateEditorMessage }}</p>
-        </form>
+    <section class="card">
+      <header class="card-header">
+        <h2>我的模板</h2>
+        <button class="primary" @click="startNewTemplate">新增模板</button>
+      </header>
+      <div class="template-list" v-if="templates.length">
+        <article
+          v-for="tpl in templates"
+          :key="tpl.id"
+          class="template-item"
+          :class="{ system: tpl.is_system }"
+        >
+          <h3>{{ tpl.name }}</h3>
+          <p class="muted">语言：{{ tpl.language.toUpperCase() }} · {{ tpl.is_system ? '系统模板' : '自定义模板' }}</p>
+          <footer>
+            <button class="link" @click="editTemplate(tpl)">编辑</button>
+            <button class="link" :disabled="tpl.is_system" @click="duplicateTemplate(tpl)">复制</button>
+            <button class="link" :disabled="tpl.is_system" @click="removeTemplate(tpl)">删除</button>
+          </footer>
+        </article>
       </div>
+      <p v-else class="muted">暂无模板。</p>
+    </section>
+
+    <section class="card" v-if="editor.visible">
+      <header class="card-header">
+        <h2>{{ editor.id ? '编辑模板' : '创建模板' }}</h2>
+        <div class="actions">
+          <button class="ghost" @click="validateContent">格式检查</button>
+          <button class="ghost" @click="cancelEdit">取消</button>
+        </div>
+      </header>
+      <form class="editor" @submit.prevent="saveTemplate">
+        <label>
+          模板名称
+          <input v-model="editor.name" type="text" required :disabled="editor.is_system" />
+        </label>
+        <label>
+          语言
+          <select v-model="editor.language" :disabled="editor.is_system">
+            <option value="java">Java</option>
+            <option value="kotlin">Kotlin</option>
+          </select>
+        </label>
+        <label>
+          模板内容
+          <textarea v-model="editor.content" rows="14" required></textarea>
+        </label>
+        <p v-if="editor.message" :class="{ error: editor.error, hint: !editor.error }">{{ editor.message }}</p>
+        <footer class="editor-actions">
+          <button class="primary" type="submit">保存模板</button>
+        </footer>
+      </form>
     </section>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 import axios from 'axios';
 
 const templates = ref([]);
-const requiredPlaceholders = ref([]);
 
-const templateEditor = reactive({ id: '', name: '', language: 'java', content: '', is_system: false });
-const templateEditorMessage = ref('');
-const templateValidationMessage = ref('');
-const templateCopySource = ref('');
+const editor = reactive({
+  visible: false,
+  id: '',
+  name: '',
+  language: 'java',
+  content: '',
+  is_system: false,
+  message: '',
+  error: false
+});
 
-const templatesByLanguage = (language) => templates.value.filter((tpl) => tpl.language === language);
-
-const resetMessages = () => {
-  templateEditorMessage.value = '';
-  templateValidationMessage.value = '';
-};
-
-const populateTemplateEditor = (template, preserveMessages = false) => {
-  templateEditor.id = String(template.id);
-  templateEditor.name = template.name;
-  templateEditor.language = template.language;
-  templateEditor.content = template.content || '';
-  templateEditor.is_system = !!template.is_system;
-  templateCopySource.value = '';
-  if (!preserveMessages) {
-    resetMessages();
-  }
-};
-
-const startNewTemplate = (language = 'java') => {
-  templateEditor.id = '';
-  templateEditor.name = '';
-  templateEditor.language = language;
-  templateEditor.content = '';
-  templateEditor.is_system = false;
-  templateCopySource.value = '';
-  resetMessages();
-};
-
-const ensureEditorSelection = () => {
-  if (!templates.value.length) {
-    startNewTemplate(templateEditor.language || 'java');
-    return;
-  }
-  if (templateEditor.id) {
-    const current = templates.value.find((tpl) => String(tpl.id) === templateEditor.id);
-    if (current) {
-      populateTemplateEditor(current, true);
-      return;
-    }
-  }
-  const systemTemplate = templates.value.find((tpl) => tpl.is_system && tpl.language === templateEditor.language);
-  if (systemTemplate) {
-    populateTemplateEditor(systemTemplate, true);
-    return;
-  }
-  populateTemplateEditor(templates.value[0], true);
-};
+const REQUIRED_PLACEHOLDERS = ['{title}', '{summary}', '{table_data}', '{data_points}'];
 
 const fetchTemplates = async () => {
   const { data } = await axios.get('/api/templates');
-  templates.value = data.items || [];
-  requiredPlaceholders.value = data.required_placeholders || [];
-  if (
-    templateCopySource.value &&
-    !templates.value.some((tpl) => String(tpl.id) === templateCopySource.value)
-  ) {
-    templateCopySource.value = '';
-  }
-  ensureEditorSelection();
+  templates.value = data;
 };
 
-const applyTemplateCopy = () => {
-  if (!templateCopySource.value) return;
-  const source = templates.value.find((tpl) => String(tpl.id) === templateCopySource.value);
-  if (source) {
-    templateEditor.language = source.language;
-    templateEditor.content = source.content || '';
-    if (!templateEditor.name) {
-      templateEditor.name = `${source.name} 副本`;
-    }
-  }
+const startNewTemplate = () => {
+  editor.visible = true;
+  editor.id = '';
+  editor.name = '';
+  editor.language = 'java';
+  editor.content = '';
+  editor.is_system = false;
+  editor.message = `请包含占位符：${REQUIRED_PLACEHOLDERS.join('、')}`;
+  editor.error = false;
 };
 
-const validateTemplate = async () => {
-  templateValidationMessage.value = '';
+const editTemplate = (tpl) => {
+  editor.visible = true;
+  editor.id = String(tpl.id);
+  editor.name = tpl.name;
+  editor.language = tpl.language;
+  editor.content = tpl.content;
+  editor.is_system = tpl.is_system;
+  editor.message = '';
+  editor.error = false;
+};
+
+const duplicateTemplate = (tpl) => {
+  editor.visible = true;
+  editor.id = '';
+  editor.name = `${tpl.name} 副本`;
+  editor.language = tpl.language;
+  editor.content = tpl.content;
+  editor.is_system = false;
+  editor.message = '';
+  editor.error = false;
+};
+
+const removeTemplate = async (tpl) => {
+  if (tpl.is_system) return;
+  if (!window.confirm('确定删除该模板？')) return;
+  await axios.delete(`/api/templates/${tpl.id}`);
+  await fetchTemplates();
+};
+
+const cancelEdit = () => {
+  editor.visible = false;
+};
+
+const validateContent = async () => {
   try {
-    const { data } = await axios.post('/api/templates/validate', { content: templateEditor.content });
-    if (data.valid) {
-      templateValidationMessage.value = '格式检查通过。';
+    const { data } = await axios.post('/api/templates/validate', { content: editor.content });
+    if (data.missing && data.missing.length) {
+      editor.message = `缺少占位符：${data.missing.join('、')}`;
+      editor.error = true;
     } else {
-      templateValidationMessage.value = `缺少占位符：${(data.missing || []).join('、')}`;
+      editor.message = '模板格式检查通过。';
+      editor.error = false;
     }
-  } catch (err) {
-    templateValidationMessage.value = err.response?.data?.message || '无法进行格式检查。';
+  } catch (error) {
+    editor.message = error.response?.data?.message || '格式检查失败';
+    editor.error = true;
   }
 };
 
 const saveTemplate = async () => {
-  if (templateEditor.is_system) {
-    templateEditorMessage.value = '系统模板不可修改。';
-    return;
-  }
-  if (!templateEditor.name.trim()) {
-    templateEditorMessage.value = '模板名称不能为空。';
-    return;
-  }
-
   try {
-    const { data } = await axios.post('/api/templates/validate', { content: templateEditor.content });
-    if (!data.valid) {
-      templateValidationMessage.value = `缺少占位符：${(data.missing || []).join('、')}`;
-      templateEditorMessage.value = '格式检查未通过，无法保存。';
-      return;
-    }
-    templateValidationMessage.value = '格式检查通过。';
-  } catch (err) {
-    templateValidationMessage.value = err.response?.data?.message || '无法进行格式检查。';
-    templateEditorMessage.value = '请稍后再试。';
-    return;
-  }
-
-  const payload = {
-    name: templateEditor.name.trim(),
-    language: templateEditor.language,
-    content: templateEditor.content
-  };
-
-  try {
-    if (templateEditor.id) {
-      await axios.patch(`/api/templates/${templateEditor.id}`, payload);
-      templateEditorMessage.value = '模板已保存。';
+    if (editor.id) {
+      await axios.patch(`/api/templates/${editor.id}`, {
+        name: editor.name,
+        language: editor.language,
+        content: editor.content
+      });
     } else {
-      const { data } = await axios.post('/api/templates', payload);
-      templateEditorMessage.value = '模板已创建。';
-      templateEditor.id = String(data.id);
+      await axios.post('/api/templates', {
+        name: editor.name,
+        language: editor.language,
+        content: editor.content
+      });
     }
+    editor.message = '模板已保存。';
+    editor.error = false;
     await fetchTemplates();
-  } catch (err) {
-    templateEditorMessage.value = err.response?.data?.message || '保存模板失败。';
+  } catch (error) {
+    editor.message = error.response?.data?.message || '保存失败';
+    editor.error = true;
   }
 };
 
-const deleteTemplate = async () => {
-  if (!templateEditor.id || templateEditor.is_system) return;
-  const confirmed = window.confirm('删除模板将影响关联任务，是否继续？');
-  if (!confirmed) return;
-  try {
-    await axios.delete(`/api/templates/${templateEditor.id}`);
-    templateEditorMessage.value = '模板已删除。';
-    startNewTemplate(templateEditor.language);
-    await fetchTemplates();
-  } catch (err) {
-    templateEditorMessage.value = err.response?.data?.message || '无法删除模板。';
-  }
-};
-
-const selectTemplateForEditing = (template) => {
-  populateTemplateEditor(template, false);
-};
-
-onMounted(async () => {
-  await fetchTemplates();
+fetchTemplates().catch(() => {
+  // ignore initial load errors，交由界面其他交互处理
 });
 </script>
 
 <style scoped>
-.template-page {
-  min-height: 100vh;
-  background: #f4f6fb;
-  padding: 32px 48px;
-  display: grid;
-  gap: 32px;
+.templates-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .page-header {
@@ -275,146 +194,111 @@ onMounted(async () => {
   align-items: center;
 }
 
-.page-header h1 {
-  margin-bottom: 8px;
-  color: #102a43;
+.muted {
+  color: #6b7280;
 }
 
-.header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.template-layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 24px;
-}
-
-.template-sidebar {
-  background: white;
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 20px 60px rgba(15, 35, 95, 0.08);
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
-.template-group-header {
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
 }
 
-.template-group ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.template-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.template-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.template-group button {
-  width: 100%;
-  text-align: left;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: #f3f6ff;
-  color: #1f3a8a;
-  transition: all 0.2s ease;
+.template-item.system {
+  background: #f3f4f6;
 }
 
-.template-group button.active {
-  background: #1f3a8a;
-  color: white;
-  border-color: #1f3a8a;
+.template-item footer {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.template-group button:hover {
-  border-color: #1f3a8a;
-}
-
-.template-group .empty {
-  color: #8798ad;
-  font-size: 14px;
-}
-
-.template-group .tag {
-  margin-left: 8px;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.template-editor {
-  background: white;
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 20px 60px rgba(15, 35, 95, 0.08);
-}
-
-.template-form {
+.editor {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.editor-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
-
-.copy-control .copy-actions {
-  margin-top: 8px;
+.editor label {
   display: flex;
-  gap: 12px;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.template-form textarea {
-  min-height: 320px;
-  font-family: 'Fira Code', 'JetBrains Mono', monospace;
-  line-height: 1.5;
+input,
+select,
+textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.95rem;
 }
 
-.placeholder-hint {
-  font-size: 14px;
-  color: #334e68;
-  background: #f1f5f9;
-  padding: 12px;
-  border-radius: 12px;
+textarea {
+  font-family: 'Fira Code', 'Menlo', monospace;
 }
 
-.template-actions {
-  display: flex;
-  gap: 12px;
+.primary {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
 }
 
-.info {
-  color: #1f3a8a;
-  background: rgba(31, 58, 138, 0.08);
-  padding: 12px;
-  border-radius: 12px;
+.ghost {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-.icon {
+.link {
   background: none;
   border: none;
+  color: #2563eb;
   cursor: pointer;
-  font-size: 18px;
-  color: #1f3a8a;
+  padding: 0;
 }
 
-@media (max-width: 960px) {
-  .template-layout {
-    grid-template-columns: 1fr;
-  }
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hint {
+  color: #2563eb;
+}
+
+.error {
+  color: #b91c1c;
 }
 </style>

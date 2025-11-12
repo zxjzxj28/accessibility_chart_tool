@@ -7,7 +7,7 @@ from flask import url_for
 
 from ..models import ChartTask, CodeTemplate
 
-REQUIRED_TEMPLATE_PLACEHOLDERS = {"{title}", "{summary}", "{generated_code}"}
+REQUIRED_TEMPLATE_PLACEHOLDERS = {"{title}", "{summary}", "{table_data}", "{data_points}"}
 
 
 class _SafeTemplateContext(dict):
@@ -26,12 +26,6 @@ def render_template_for_task(template: CodeTemplate, task: ChartTask) -> str:
     if not result.is_success:
         raise ValueError("任务生成失败，无法渲染模板。")
 
-    base_code = result.java_code if template.language == "java" else result.kotlin_code
-    if not base_code and task.language == template.language and result.generated_code:
-        base_code = result.generated_code
-    if not base_code:
-        raise ValueError("Task does not have generated code for the requested template language.")
-
     try:
         image_url = (
             url_for("charts.serve_upload", filename=task.image_path, _external=True)
@@ -44,10 +38,8 @@ def render_template_for_task(template: CodeTemplate, task: ChartTask) -> str:
     context = _SafeTemplateContext(
         title=task.title,
         summary=(result.summary or "") if result else "",
-        description=(result.description or "") if result else "",
-        generated_code=base_code,
-        data_points_json=json.dumps((result.data_points or []) if result else []),
-        table_data_json=json.dumps((result.table_data or []) if result else []),
+        table_data=json.dumps(result.table_data or []),
+        data_points=json.dumps(result.data_points or []),
         image_url=image_url,
     )
     try:

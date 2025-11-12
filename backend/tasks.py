@@ -7,7 +7,7 @@ from typing import Optional
 from flask import Flask
 
 from .extensions import db
-from .models import ChartTask, ChartTaskResult, CodeTemplate
+from .models import ChartTask, ChartTaskResult
 from .utils.chart_processing import process_chart
 from .utils.template_engine import render_template_for_task
 
@@ -58,29 +58,9 @@ class ChartProcessingWorker:
 
                     task_result.is_success = True
                     task_result.summary = result_payload.get("summary")
-                    task_result.description = result_payload.get("description")
                     task_result.data_points = result_payload.get("data_points")
                     task_result.table_data = result_payload.get("table_data")
-                    task_result.generated_code = result_payload.get("generated_code")
-                    task_result.java_code = result_payload.get("java_code")
-                    task_result.kotlin_code = result_payload.get("kotlin_code")
-                    task_result.integration_doc = result_payload.get("integration_doc")
                     task_result.error_message = None
-
-                    if task.template_id:
-                        template = CodeTemplate.query.get(task.template_id)
-                        if template:
-                            try:
-                                task_result.generated_code = render_template_for_task(
-                                    template, task
-                                )
-                                task.language = template.language
-                            except ValueError:
-                                pass
-                    elif task.language == "java" and task_result.java_code:
-                        task_result.generated_code = task_result.java_code
-                    elif task.language == "kotlin" and task_result.kotlin_code:
-                        task_result.generated_code = task_result.kotlin_code
 
                     task.status = "completed"
                     db.session.commit()

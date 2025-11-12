@@ -5,6 +5,7 @@ import json
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from flask import (
     abort,
@@ -16,7 +17,7 @@ from flask import (
     url_for,
 )
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
@@ -29,7 +30,6 @@ from ..models import (
     CodeTemplate,
 )
 from ..tasks import TaskPayload, worker
-from ..utils.chart_processing import build_accessible_code
 from ..utils.template_engine import (
     REQUIRED_TEMPLATE_PLACEHOLDERS,
     render_template_for_task,
@@ -42,66 +42,37 @@ def _current_user_id() -> int:
     identity = get_jwt_identity()
     try:
         return int(identity)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # pragma: no cover - defensive
         abort(401, description="Invalid authentication token.")
 
 
-def _ensure_owner(task: ChartTask, user_id: int):
-    if task.user_id != user_id:
-        return jsonify({"message": "Not found."}), 404
-    return None
-
-
-def _build_group_tree(groups: list[ChartGroup]) -> list[dict[str, object]]:
-    nodes: dict[int, dict[str, object]] = {}
+def _application_payload(app: ChartApplication) -> dict[str, Any]:
+    groups = [group for group in app.groups if not group.is_deleted]
+    nodes: dict[int, dict[str, Any]] = {}
     ordered = sorted(groups, key=lambda g: (g.parent_id or 0, g.created_at))
     for group in ordered:
-        node = group.to_dict()
-        node["children"] = []
-        nodes[group.id] = node
+        payload = group.to_dict()
+        payload["children"] = []
+        nodes[group.id] = payload
 
-    roots: list[dict[str, object]] = []
+    roots: list[dict[str, Any]] = []
     for group in ordered:
-        node = nodes[group.id]
         parent_id = group.parent_id
+        node = nodes[group.id]
         if parent_id and parent_id in nodes:
             nodes[parent_id]["children"].append(node)
         else:
             roots.append(node)
 
-    return roots
-
-
-def _collect_descendant_ids(group: ChartGroup) -> set[int]:
-    ids = {group.id}
-    for child in group.children:
-        ids.update(_collect_descendant_ids(child))
-    return ids
-
-
-def _application_payload(application: ChartApplication) -> dict[str, object]:
-    payload = application.to_dict()
-    payload["groups"] = _build_group_tree(application.groups)
+    payload = app.to_dict()
+    payload["groups"] = roots
     return payload
 
 
 def _ensure_template_access(template: CodeTemplate, user_id: int) -> bool:
     if template.is_system:
-        return True
-    return template.user_id == user_id
-
-
-def _load_custom_code(task: ChartTask) -> dict[str, str]:
-    if not task.result or not task.result.custom_code:
-        return {}
-    try:
-        data = json.loads(task.result.custom_code)
-        if isinstance(data, dict):
-            return {str(key): str(value) for key, value in data.items()}
-    except (TypeError, json.JSONDecodeError):
-        if task.result and task.result.custom_code:
-            return {"legacy": task.result.custom_code}
-    return {}
+        return not template.is_deleted
+    return template.user_id == user_id and not template.is_deleted
 
 
 @bp.get("/uploads/<path:filename>")
@@ -114,12 +85,13 @@ def serve_upload(filename: str):
 @jwt_required()
 def list_applications():
     user_id = _current_user_id()
-    applications = (
-        ChartApplication.query.filter_by(user_id=user_id)
+    apps = (
+        ChartApplication.query.filter_by(user_id=user_id, is_deleted=False)
+        .options(joinedload(ChartApplication.groups))
         .order_by(ChartApplication.created_at.asc())
         .all()
     )
-    return jsonify([_application_payload(app) for app in applications])
+    return jsonify([_application_payload(app) for app in apps])
 
 
 @bp.post("/groups")
@@ -128,29 +100,30 @@ def create_group():
     user_id = _current_user_id()
     payload = request.get_json() or {}
     name = (payload.get("name") or "").strip()
+    app_id = payload.get("app_id")
     parent_id = payload.get("parent_id")
-    application_id = payload.get("application_id")
-    if not name:
-        return jsonify({"message": "Group name is required."}), 400
-    if not application_id:
-        return jsonify({"message": "Application id is required."}), 400
 
-    application = (
-        ChartApplication.query.filter_by(id=int(application_id), user_id=user_id)
-        .first()
-    )
+    if not name:
+        return jsonify({"message": "分组名称不能为空"}), 400
+    if not app_id:
+        return jsonify({"message": "缺少应用标识"}), 400
+
+    application = ChartApplication.query.filter_by(
+        id=int(app_id), user_id=user_id, is_deleted=False
+    ).first()
     if not application:
-        return jsonify({"message": "Application not found."}), 404
+        return jsonify({"message": "应用不存在"}), 404
+
     parent = None
-    if parent_id is not None:
+    if parent_id:
         parent = ChartGroup.query.get(parent_id)
-        if not parent or parent.user_id != user_id:
-            return jsonify({"message": "Parent group not found."}), 400
-        if parent.application_id != application.id:
-            return jsonify({"message": "Parent group must belong to the same application."}), 400
-    group = ChartGroup(name=name, user_id=user_id, parent=parent, application=application)
+        if not parent or parent.is_deleted or parent.application != application:
+            return jsonify({"message": "父分组无效"}), 400
+
+    group = ChartGroup(name=name, application=application, parent=parent)
     db.session.add(group)
     db.session.commit()
+
     data = group.to_dict()
     data["children"] = []
     return jsonify(data), 201
@@ -161,8 +134,8 @@ def create_group():
 def update_group(group_id: int):
     user_id = _current_user_id()
     group = ChartGroup.query.get_or_404(group_id)
-    if group.user_id != user_id:
-        return jsonify({"message": "Not found."}), 404
+    if group.is_deleted or group.application.user_id != user_id:
+        return jsonify({"message": "未找到分组"}), 404
 
     payload = request.get_json() or {}
     name = payload.get("name")
@@ -172,7 +145,7 @@ def update_group(group_id: int):
     if name is not None:
         name = name.strip()
         if not name:
-            return jsonify({"message": "Group name is required."}), 400
+            return jsonify({"message": "分组名称不能为空"}), 400
         group.name = name
 
     if application_id is not None:
@@ -188,17 +161,15 @@ def update_group(group_id: int):
 
     if parent_id is not None:
         if parent_id == group.id:
-            return jsonify({"message": "Group cannot be its own parent."}), 400
+            return jsonify({"message": "不能将分组设为自己的子级"}), 400
         if parent_id:
             parent = ChartGroup.query.get(parent_id)
-            if not parent or parent.user_id != user_id:
-                return jsonify({"message": "Parent group not found."}), 400
-            if parent.application_id != group.application_id:
-                return jsonify({"message": "Parent group must belong to the same application."}), 400
+            if not parent or parent.is_deleted or parent.application != group.application:
+                return jsonify({"message": "父分组无效"}), 400
             ancestor = parent
             while ancestor:
                 if ancestor.id == group.id:
-                    return jsonify({"message": "Cannot move group under its descendant."}), 400
+                    return jsonify({"message": "不能出现循环嵌套"}), 400
                 ancestor = ancestor.parent
             group.parent = parent
         else:
@@ -206,8 +177,17 @@ def update_group(group_id: int):
 
     db.session.commit()
     data = group.to_dict()
-    data["children"] = [child.to_dict() for child in group.children]
+    data["children"] = [child.to_dict() for child in group.children if not child.is_deleted]
     return jsonify(data)
+
+
+def _soft_delete_group(group: ChartGroup) -> None:
+    group.is_deleted = True
+    for task in group.tasks:
+        task.is_deleted = True
+    for child in group.children:
+        if not child.is_deleted:
+            _soft_delete_group(child)
 
 
 @bp.delete("/groups/<int:group_id>")
@@ -215,66 +195,145 @@ def update_group(group_id: int):
 def delete_group(group_id: int):
     user_id = _current_user_id()
     group = ChartGroup.query.get_or_404(group_id)
-    if group.user_id != user_id:
-        return jsonify({"message": "Not found."}), 404
-    db.session.delete(group)
+    if group.is_deleted or group.application.user_id != user_id:
+        return jsonify({"message": "未找到分组"}), 404
+
+    _soft_delete_group(group)
     db.session.commit()
-    return jsonify({"message": "Group deleted."})
+    return jsonify({"message": "分组已删除"})
+
+
+def _ensure_default_application(user_id: int) -> ChartApplication:
+    default_app = (
+        ChartApplication.query.filter_by(
+            user_id=user_id, name="默认应用"
+        )
+        .order_by(ChartApplication.created_at.asc())
+        .first()
+    )
+    if default_app:
+        if default_app.is_deleted:
+            default_app.is_deleted = False
+            db.session.commit()
+        return default_app
+
+    default_app = ChartApplication(name="默认应用", user_id=user_id)
+    db.session.add(default_app)
+    db.session.commit()
+    return default_app
+
+
+def _resolve_application(user_id: int, name: str | None, app_id: str | None) -> ChartApplication:
+    if app_id:
+        try:
+            app_int = int(app_id)
+        except (TypeError, ValueError):
+            raise ValueError("应用不存在") from None
+        application = ChartApplication.query.filter_by(
+            id=app_int, user_id=user_id
+        ).first()
+        if not application:
+            raise ValueError("应用不存在")
+        if application.is_deleted:
+            application.is_deleted = False
+            db.session.commit()
+        return application
+
+    if name:
+        match = (
+            ChartApplication.query.filter(
+                ChartApplication.user_id == user_id,
+                func.lower(ChartApplication.name) == name.lower(),
+            )
+            .order_by(ChartApplication.created_at.asc())
+            .first()
+        )
+        if match:
+            if match.is_deleted:
+                match.is_deleted = False
+                db.session.commit()
+            return match
+        application = ChartApplication(name=name, user_id=user_id)
+        db.session.add(application)
+        db.session.commit()
+        return application
+
+    return _ensure_default_application(user_id)
+
+
+def _resolve_group(app: ChartApplication, group_id: str | None) -> ChartGroup | None:
+    if not group_id:
+        return None
+    try:
+        group_int = int(group_id)
+    except (TypeError, ValueError):
+        raise ValueError("分组不存在") from None
+    group = ChartGroup.query.get(group_int)
+    if not group or group.is_deleted or group.application != app:
+        raise ValueError("分组不存在")
+    return group
+
+
+def _resolve_template(user_id: int, template_id: str | None) -> CodeTemplate | None:
+    if not template_id:
+        return None
+    try:
+        template_int = int(template_id)
+    except (TypeError, ValueError):
+        raise ValueError("模板不可用") from None
+    template = CodeTemplate.query.get(template_int)
+    if not template or not _ensure_template_access(template, user_id):
+        raise ValueError("模板不可用")
+    return template
+
+
+def _save_upload(file_storage) -> str:
+    upload_folder = Path(current_app.config["UPLOAD_FOLDER"])
+    upload_folder.mkdir(parents=True, exist_ok=True)
+    filename = secure_filename(file_storage.filename or "chart.png")
+    ext = Path(filename).suffix or ".png"
+    target = upload_folder / f"{uuid.uuid4().hex}{ext}"
+    file_storage.save(target)
+    return target.name
 
 
 @bp.get("/tasks")
 @jwt_required()
 def list_tasks():
     user_id = _current_user_id()
+    keyword = (request.args.get("keyword") or "").strip()
+    app_id = request.args.get("app_id")
     group_id = request.args.get("group_id")
-    application_id = request.args.get("application_id")
-    search = (request.args.get("q") or "").strip().lower()
-    page = max(int(request.args.get("page", 1) or 1), 1)
-    page_size = int(request.args.get("page_size", 10) or 10)
-    page_size = max(1, min(page_size, 50))
+    page = int(request.args.get("page", 1))
+    per_page = min(int(request.args.get("per_page", 12)), 50)
 
     query = (
-        ChartTask.query.filter_by(user_id=user_id)
-        .options(
+        ChartTask.query.options(
             joinedload(ChartTask.application),
             joinedload(ChartTask.group),
             joinedload(ChartTask.template),
             joinedload(ChartTask.result),
         )
-        .outerjoin(ChartTaskResult)
+        .filter_by(user_id=user_id, is_deleted=False)
+        .order_by(ChartTask.created_at.desc())
     )
-    if application_id:
-        application = (
-            ChartApplication.query.filter_by(id=int(application_id), user_id=user_id)
-            .first()
-        )
-        if not application:
-            return jsonify({"message": "Application not found."}), 404
-        query = query.filter_by(application_id=application.id)
+
+    if app_id:
+        query = query.filter(ChartTask.app_id == int(app_id))
     if group_id:
-        group = ChartGroup.query.filter_by(id=int(group_id), user_id=user_id).first()
-        if not group:
-            return jsonify({"message": "Group not found."}), 404
-        ids = _collect_descendant_ids(group)
-        query = query.filter(ChartTask.group_id.in_(ids))
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            func.lower(ChartTask.title).like(pattern)
-            | func.lower(func.coalesce(ChartTaskResult.summary, "")).like(pattern)
-            | func.lower(func.coalesce(ChartTaskResult.description, "")).like(pattern)
+        query = query.filter(ChartTask.group_id == int(group_id))
+    if keyword:
+        like = f"%{keyword}%"
+        query = query.outerjoin(ChartTaskResult).filter(
+            or_(ChartTask.title.ilike(like), ChartTaskResult.summary.ilike(like))
         )
 
-    pagination = (
-        query.order_by(ChartTask.created_at.desc())
-        .paginate(page=page, per_page=page_size, error_out=False)
-    )
-    items = [task.to_dict() for task in pagination.items]
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
     return jsonify(
         {
             "items": items,
             "page": pagination.page,
-            "page_size": page_size,
             "pages": pagination.pages,
             "total": pagination.total,
         }
@@ -286,146 +345,194 @@ def list_tasks():
 @jwt_required()
 def create_task():
     user_id = _current_user_id()
-    if "image" not in request.files:
-        return jsonify({"message": "Image file is required."}), 400
+    if "file" not in request.files:
+        return jsonify({"message": "请上传图表图片"}), 400
 
-    image_file = request.files["image"]
-    title = request.form.get("title") or Path(image_file.filename or "chart").stem
-    group_id = request.form.get("group_id")
-    application_id = request.form.get("application_id")
+    file_storage = request.files["file"]
+    if file_storage.filename == "":
+        return jsonify({"message": "请选择有效的图片文件"}), 400
+
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        return jsonify({"message": "任务标题不能为空"}), 400
+
     application_name = (request.form.get("application_name") or "").strip()
+    application_id = request.form.get("application_id")
+    group_id = request.form.get("group_id")
     template_id = request.form.get("template_id")
 
-    if not image_file.filename:
-        return jsonify({"message": "Invalid file."}), 400
+    try:
+        application = _resolve_application(user_id, application_name, application_id)
+        group = _resolve_group(application, group_id)
+        template = _resolve_template(user_id, template_id)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
 
-    filename = secure_filename(image_file.filename)
-    ext = Path(filename).suffix
-    unique_name = f"{uuid.uuid4().hex}{ext}"
-    upload_folder = Path(current_app.config["UPLOAD_FOLDER"]) / str(user_id)
-    upload_folder.mkdir(parents=True, exist_ok=True)
-    file_path = upload_folder / unique_name
-    image_file.save(file_path)
-
-    relative_path = str(Path(str(user_id)) / unique_name)
-    public_url = url_for("charts.serve_upload", filename=relative_path, _external=True)
-
-    application: ChartApplication | None = None
-    if application_id:
-        application = (
-            ChartApplication.query.filter_by(id=int(application_id), user_id=user_id)
-            .first()
-        )
-        if not application:
-            return jsonify({"message": "Application not found."}), 404
-    elif application_name:
-        application = (
-            ChartApplication.query.filter_by(name=application_name, user_id=user_id)
-            .first()
-        )
-        if not application:
-            application = ChartApplication(name=application_name, user_id=user_id)
-            db.session.add(application)
-            db.session.flush()
-    else:
-        application = (
-            ChartApplication.query.filter_by(user_id=user_id)
-            .order_by(ChartApplication.created_at.asc())
-            .first()
-        )
-        if not application:
-            application = ChartApplication(name="默认应用", user_id=user_id)
-            db.session.add(application)
-            db.session.flush()
-
-    target_group = None
-    if group_id:
-        target_group = ChartGroup.query.filter_by(id=int(group_id), user_id=user_id).first()
-        if not target_group:
-            return jsonify({"message": "Group not found."}), 404
-        if target_group.application_id != application.id:
-            return jsonify({"message": "Group does not belong to the selected application."}), 400
-
-    selected_template: CodeTemplate | None = None
-    if template_id:
-        try:
-            template_id_int = int(template_id)
-        except (TypeError, ValueError):
-            return jsonify({"message": "Template not found."}), 404
-        selected_template = CodeTemplate.query.get(template_id_int)
-        if not selected_template or not _ensure_template_access(selected_template, user_id):
-            return jsonify({"message": "Template not found."}), 404
-    else:
-        selected_template = (
-            CodeTemplate.query.filter_by(is_system=True, language="java")
-            .order_by(CodeTemplate.created_at.asc())
-            .first()
-            or CodeTemplate.query.filter(
-                (CodeTemplate.user_id == user_id) | (CodeTemplate.is_system.is_(True)),
-                CodeTemplate.language == "java",
-            )
-            .order_by(CodeTemplate.is_system.desc(), CodeTemplate.created_at.asc())
-            .first()
-        )
-
-    language = selected_template.language if selected_template else "java"
+    filename = _save_upload(file_storage)
+    public_url = url_for("charts.serve_upload", filename=filename, _external=True)
 
     task = ChartTask(
         title=title,
+        status="queued",
         user_id=user_id,
-        application_id=application.id,
-        group_id=target_group.id if target_group else None,
-        language=language,
-        image_path=str(relative_path),
-        status="pending",
-        template=selected_template,
+        application=application,
+        group=group,
+        image_path=filename,
+        template=template,
     )
     db.session.add(task)
     db.session.commit()
 
-    worker.enqueue(TaskPayload(task_id=task.id, image_path=str(file_path), public_image_url=public_url))
+    worker.enqueue(TaskPayload(task_id=task.id, image_path=str(Path(current_app.config["UPLOAD_FOLDER"]) / filename), public_image_url=public_url))
 
     return jsonify(task.to_dict()), 201
+
+
+def _load_task(task_id: int, user_id: int) -> ChartTask:
+    task = (
+        ChartTask.query.options(
+            joinedload(ChartTask.application),
+            joinedload(ChartTask.group),
+            joinedload(ChartTask.template),
+            joinedload(ChartTask.result),
+        )
+        .filter_by(id=task_id, user_id=user_id)
+        .first()
+    )
+    if not task or task.is_deleted:
+        abort(404, description="任务不存在")
+    return task
+
+
+@bp.get("/tasks/<int:task_id>")
+@jwt_required()
+def get_task(task_id: int):
+    user_id = _current_user_id()
+    task = _load_task(task_id, user_id)
+    return jsonify(task.to_dict())
+
+
+@bp.patch("/tasks/<int:task_id>")
+@jwt_required()
+def update_task(task_id: int):
+    user_id = _current_user_id()
+    task = _load_task(task_id, user_id)
+    payload = request.get_json() or {}
+
+    title = payload.get("title")
+    if title is not None:
+        title = title.strip()
+        if not title:
+            return jsonify({"message": "任务标题不能为空"}), 400
+        task.title = title
+
+    app_id = payload.get("app_id")
+    group_id = payload.get("group_id")
+    template_id = payload.get("template_id")
+
+    try:
+        application = task.application
+        if app_id:
+            application = _resolve_application(user_id, None, app_id)
+            task.application = application
+            task.app_id = application.id
+        if group_id is not None:
+            group = _resolve_group(application, group_id)
+            task.group = group
+        if template_id is not None:
+            task.template = _resolve_template(user_id, template_id)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+
+    db.session.commit()
+    return jsonify(task.to_dict())
+
+
+@bp.post("/tasks/<int:task_id>/cancel")
+@jwt_required()
+def cancel_task(task_id: int):
+    user_id = _current_user_id()
+    task = _load_task(task_id, user_id)
+    if task.status not in {"queued", "processing"}:
+        return jsonify({"message": "当前状态无法取消"}), 400
+    task.status = "cancelled"
+    db.session.commit()
+    return jsonify({"message": "任务已取消"})
+
+
+@bp.delete("/tasks/<int:task_id>")
+@jwt_required()
+def delete_task(task_id: int):
+    user_id = _current_user_id()
+    task = _load_task(task_id, user_id)
+    task.is_deleted = True
+    db.session.commit()
+    return jsonify({"message": "任务已删除"})
+
+
+@bp.get("/tasks/<int:task_id>/download")
+@jwt_required()
+def download_task_bundle(task_id: int):
+    user_id = _current_user_id()
+    task = _load_task(task_id, user_id)
+    if not task.result or not task.result.is_success:
+        return jsonify({"message": "任务尚未完成"}), 400
+
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, "w") as archive:
+        archive.writestr("summary.txt", (task.result.summary or "").encode("utf-8"))
+        archive.writestr(
+            "table_data.json",
+            (json.dumps(task.result.table_data or [], ensure_ascii=False)).encode("utf-8"),
+        )
+        archive.writestr(
+            "data_points.json",
+            (json.dumps(task.result.data_points or [], ensure_ascii=False)).encode("utf-8"),
+        )
+
+    memory_file.seek(0)
+    return send_file(
+        memory_file,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"task-{task.id}-bundle.zip",
+    )
+
+
+@bp.get("/tasks/<int:task_id>/render-template")
+@jwt_required()
+def render_template_view(task_id: int):
+    user_id = _current_user_id()
+    template_id = request.args.get("template_id")
+    if not template_id:
+        return jsonify({"message": "缺少模板标识"}), 400
+
+    task = _load_task(task_id, user_id)
+    template = CodeTemplate.query.get(template_id)
+    if not template or not _ensure_template_access(template, user_id):
+        return jsonify({"message": "模板不可用"}), 404
+
+    try:
+        rendered = render_template_for_task(template, task)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+
+    return jsonify({"content": rendered, "language": template.language})
 
 
 @bp.get("/templates")
 @jwt_required()
 def list_templates():
     user_id = _current_user_id()
-    language = request.args.get("language")
-    include_system = (request.args.get("include_system", "true") or "true").lower()
-    include_system_flag = include_system not in {"false", "0"}
-
-    query = CodeTemplate.query
-    if language:
-        language = language.lower()
-        if language not in {"java", "kotlin"}:
-            return jsonify({"message": "Unsupported language."}), 400
-        query = query.filter_by(language=language)
-
-    if include_system_flag:
-        query = query.filter(
-            (CodeTemplate.user_id == user_id) | (CodeTemplate.is_system.is_(True))
-        )
-    else:
-        query = query.filter_by(user_id=user_id)
-
     templates = (
-        query.order_by(CodeTemplate.is_system.desc(), CodeTemplate.created_at.asc())
+        CodeTemplate.query.filter(
+            (CodeTemplate.is_system == True) | (CodeTemplate.user_id == user_id)  # noqa: E712
+        )
+        .filter_by(is_deleted=False)
+        .order_by(CodeTemplate.is_system.desc(), CodeTemplate.created_at.asc())
         .all()
     )
-    items = []
-    for template in templates:
-        data = template.to_dict()
-        data["editable"] = not template.is_system and template.user_id == user_id
-        data["deletable"] = data["editable"]
-        items.append(data)
-    return jsonify(
-        {
-            "items": items,
-            "required_placeholders": list(REQUIRED_TEMPLATE_PLACEHOLDERS),
-        }
-    )
+    return jsonify([template.to_dict() for template in templates])
 
 
 @bp.post("/templates")
@@ -436,27 +543,29 @@ def create_template():
     name = (payload.get("name") or "").strip()
     language = (payload.get("language") or "").strip().lower()
     content = payload.get("content") or ""
+
     if not name:
-        return jsonify({"message": "Template name is required."}), 400
+        return jsonify({"message": "模板名称不能为空"}), 400
     if language not in {"java", "kotlin"}:
-        return jsonify({"message": "Unsupported language."}), 400
+        return jsonify({"message": "仅支持 Java 或 Kotlin 模板"}), 400
+
     missing = validate_template_content(content)
     if missing:
-        return jsonify({"message": "Template missing placeholders.", "missing": missing}), 400
+        return (
+            jsonify({"message": "模板缺少必需占位符", "missing": missing}),
+            400,
+        )
 
     template = CodeTemplate(
         name=name,
         language=language,
         content=content,
         user_id=user_id,
-        is_system=False,
     )
     db.session.add(template)
     db.session.commit()
-    data = template.to_dict()
-    data["editable"] = True
-    data["deletable"] = True
-    return jsonify(data), 201
+
+    return jsonify(template.to_dict()), 201
 
 
 @bp.patch("/templates/<int:template_id>")
@@ -464,8 +573,10 @@ def create_template():
 def update_template(template_id: int):
     user_id = _current_user_id()
     template = CodeTemplate.query.get_or_404(template_id)
-    if template.is_system or template.user_id != user_id:
-        return jsonify({"message": "Template not found."}), 404
+    if not _ensure_template_access(template, user_id):
+        return jsonify({"message": "无权访问该模板"}), 404
+    if template.is_system:
+        return jsonify({"message": "系统模板不支持直接修改"}), 400
 
     payload = request.get_json() or {}
     name = payload.get("name")
@@ -475,26 +586,26 @@ def update_template(template_id: int):
     if name is not None:
         name = name.strip()
         if not name:
-            return jsonify({"message": "Template name is required."}), 400
+            return jsonify({"message": "模板名称不能为空"}), 400
         template.name = name
 
     if language is not None:
         language = language.strip().lower()
         if language not in {"java", "kotlin"}:
-            return jsonify({"message": "Unsupported language."}), 400
+            return jsonify({"message": "仅支持 Java 或 Kotlin 模板"}), 400
         template.language = language
 
     if content is not None:
         missing = validate_template_content(content)
         if missing:
-            return jsonify({"message": "Template missing placeholders.", "missing": missing}), 400
+            return (
+                jsonify({"message": "模板缺少必需占位符", "missing": missing}),
+                400,
+            )
         template.content = content
 
     db.session.commit()
-    data = template.to_dict()
-    data["editable"] = True
-    data["deletable"] = True
-    return jsonify(data)
+    return jsonify(template.to_dict())
 
 
 @bp.delete("/templates/<int:template_id>")
@@ -502,357 +613,20 @@ def update_template(template_id: int):
 def delete_template(template_id: int):
     user_id = _current_user_id()
     template = CodeTemplate.query.get_or_404(template_id)
-    if template.is_system or template.user_id != user_id:
-        return jsonify({"message": "Template not found."}), 404
+    if template.is_system:
+        return jsonify({"message": "系统模板不可删除"}), 400
+    if template.user_id != user_id:
+        return jsonify({"message": "未找到模板"}), 404
 
-    affected_tasks = (
-        ChartTask.query.options(joinedload(ChartTask.result))
-        .filter_by(template_id=template.id)
-        .all()
-    )
-    for task in affected_tasks:
-        task.template = None
-        if task.status == "completed" and task.result:
-            if task.language == "java" and task.result.java_code:
-                task.result.generated_code = task.result.java_code
-            elif task.language == "kotlin" and task.result.kotlin_code:
-                task.result.generated_code = task.result.kotlin_code
-    db.session.delete(template)
+    template.is_deleted = True
     db.session.commit()
-    return jsonify({"message": "Template deleted.", "affected_tasks": len(affected_tasks)})
+    return jsonify({"message": "模板已删除"})
 
 
 @bp.post("/templates/validate")
 @jwt_required()
-def validate_template_endpoint():
+def validate_template():
     payload = request.get_json() or {}
     content = payload.get("content") or ""
     missing = validate_template_content(content)
-    return jsonify(
-        {
-            "valid": not missing,
-            "missing": missing,
-            "required_placeholders": list(REQUIRED_TEMPLATE_PLACEHOLDERS),
-        }
-    )
-
-
-@bp.get("/tasks/<int:task_id>")
-@jwt_required()
-def get_task(task_id: int):
-    user_id = _current_user_id()
-    task = (
-        ChartTask.query.options(
-            joinedload(ChartTask.result),
-            joinedload(ChartTask.application),
-            joinedload(ChartTask.template),
-        )
-        .filter_by(id=task_id)
-        .first_or_404()
-    )
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-    return jsonify(task.to_dict())
-
-
-@bp.patch("/tasks/<int:task_id>")
-@jwt_required()
-def update_task(task_id: int):
-    user_id = _current_user_id()
-    task = (
-        ChartTask.query.options(joinedload(ChartTask.result))
-        .filter_by(id=task_id)
-        .first_or_404()
-    )
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    payload = request.get_json() or {}
-
-    title = payload.get("title")
-    if title is not None:
-        title = title.strip()
-        if not title:
-            return jsonify({"message": "Task title is required."}), 400
-        task.title = title
-
-    group_id = payload.get("group_id")
-    application_id = payload.get("application_id")
-    template_id = payload.get("template_id")
-    if group_id is not None:
-        if group_id == "":
-            group_id = None
-        if group_id is None:
-            task.group_id = None
-        else:
-            group = ChartGroup.query.filter_by(id=int(group_id), user_id=user_id).first()
-            if not group:
-                return jsonify({"message": "Group not found."}), 404
-            task.group_id = group.id
-            task.application_id = group.application_id
-
-    if application_id is not None:
-        if application_id == "":
-            return jsonify({"message": "Application id is required."}), 400
-        application = (
-            ChartApplication.query.filter_by(id=int(application_id), user_id=user_id)
-            .first()
-        )
-        if not application:
-            return jsonify({"message": "Application not found."}), 404
-        task.application_id = application.id
-        if task.group and task.group.application_id != task.application_id:
-            task.group = None
-
-    language = payload.get("language")
-    if language is not None:
-        language = language.lower()
-        if language not in {"java", "kotlin"}:
-            return jsonify({"message": "Unsupported language."}), 400
-        task.language = language
-        if task.result:
-            if language == "java" and task.result.java_code:
-                task.result.generated_code = task.result.java_code
-            elif language == "kotlin" and task.result.kotlin_code:
-                task.result.generated_code = task.result.kotlin_code
-
-    if template_id is not None:
-        if template_id == "":
-            task.template = None
-        else:
-            template = CodeTemplate.query.get(int(template_id))
-            if not template or not _ensure_template_access(template, user_id):
-                return jsonify({"message": "Template not found."}), 404
-            task.template = template
-            task.language = template.language
-            if (
-                task.status == "completed"
-                and task.result
-                and (task.result.java_code or task.result.kotlin_code)
-            ):
-                try:
-                    task.result.generated_code = render_template_for_task(template, task)
-                except ValueError:
-                    pass
-
-    if template_id is not None:
-        if template_id == "":
-            task.template = None
-        else:
-            template = CodeTemplate.query.get(int(template_id))
-            if not template or not _ensure_template_access(template, user_id):
-                return jsonify({"message": "Template not found."}), 404
-            task.template = template
-            task.language = template.language
-            if task.status == "completed" and (task.java_code or task.kotlin_code):
-                try:
-                    task.generated_code = _render_template_for_task(template, task)
-                except ValueError:
-                    pass
-
-    db.session.commit()
-    return jsonify(task.to_dict())
-
-
-@bp.delete("/tasks/<int:task_id>")
-@jwt_required()
-def delete_task(task_id: int):
-    user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    if task.image_path:
-        file_path = Path(current_app.config["UPLOAD_FOLDER"]) / task.image_path
-        if file_path.exists():
-            file_path.unlink()
-    db.session.delete(task)
-    db.session.commit()
-    return jsonify({"message": "Task deleted."})
-
-
-@bp.post("/tasks/<int:task_id>/cancel")
-@jwt_required()
-def cancel_task(task_id: int):
-    user_id = _current_user_id()
-    task = ChartTask.query.get_or_404(task_id)
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    if task.status in {"completed", "failed"}:
-        return jsonify({"message": "Task already finished."}), 400
-
-    task.status = "cancelled"
-    db.session.commit()
-    return jsonify({"message": "Task cancelled."})
-
-
-@bp.post("/tasks/<int:task_id>/custom-code")
-@jwt_required()
-def update_custom_code(task_id: int):
-    user_id = _current_user_id()
-    task = (
-        ChartTask.query.options(joinedload(ChartTask.result))
-        .filter_by(id=task_id)
-        .first_or_404()
-    )
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    if not task.result or task.status != "completed":
-        return jsonify({"message": "任务尚未完成，无法保存自定义代码。"}), 400
-
-    payload = request.get_json() or {}
-    language = (payload.get("language") or task.language or "java").lower()
-    if language not in {"java", "kotlin"}:
-        return jsonify({"message": "Unsupported language."}), 400
-    code = payload.get("code")
-    existing = _load_custom_code(task)
-    if code:
-        existing[language] = code
-    else:
-        existing.pop(language, None)
-    task.result.custom_code = json.dumps(existing) if existing else None
-    db.session.commit()
-    return jsonify(task.to_dict())
-
-
-@bp.post("/tasks/<int:task_id>/regenerate-code")
-@jwt_required()
-def regenerate_code(task_id: int):
-    user_id = _current_user_id()
-    task = (
-        ChartTask.query.options(joinedload(ChartTask.result))
-        .filter_by(id=task_id)
-        .first_or_404()
-    )
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    if not task.result or not task.result.summary or not task.result.data_points:
-        return jsonify({"message": "Task data not ready."}), 400
-    language = (request.args.get("language") or task.language or "java").lower()
-    payload = request.get_json(silent=True) or {}
-    language = (payload.get("language") or language).lower()
-    if language not in {"java", "kotlin"}:
-        return jsonify({"message": "Unsupported language."}), 400
-
-    public_url = url_for("charts.serve_upload", filename=task.image_path, _external=True)
-    regenerated_bundle = build_accessible_code(
-        public_url, task.result.summary, task.result.data_points
-    )
-    if language == "java":
-        task.result.java_code = regenerated_bundle.get("java")
-    else:
-        task.result.kotlin_code = regenerated_bundle.get("kotlin")
-
-    if task.language == language:
-        task.result.generated_code = regenerated_bundle.get(language)
-    task.result.integration_doc = (
-        regenerated_bundle.get("integration") or task.result.integration_doc
-    )
-    db.session.commit()
-    return jsonify(task.to_dict())
-
-
-@bp.post("/tasks/<int:task_id>/render-template")
-@jwt_required()
-def render_template_endpoint(task_id: int):
-    user_id = _current_user_id()
-    task = (
-        ChartTask.query.options(joinedload(ChartTask.result))
-        .filter_by(id=task_id)
-        .first_or_404()
-    )
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    payload = request.get_json() or {}
-    template_id = payload.get("template_id")
-    if template_id in {None, ""}:
-        return jsonify({"message": "Template id is required."}), 400
-    try:
-        template_id_int = int(template_id)
-    except (TypeError, ValueError):
-        return jsonify({"message": "Template id is required."}), 400
-    template = CodeTemplate.query.get(template_id_int)
-    if not template or not _ensure_template_access(template, user_id):
-        return jsonify({"message": "Template not found."}), 404
-    if task.status != "completed":
-        return jsonify({"message": "Task code not ready."}), 400
-    try:
-        rendered = render_template_for_task(template, task)
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
-    return jsonify({"code": rendered, "language": template.language})
-
-
-@bp.get("/tasks/<int:task_id>/download")
-@jwt_required()
-def download_code_archive(task_id: int):
-    user_id = _current_user_id()
-    task = (
-        ChartTask.query.options(joinedload(ChartTask.result))
-        .filter_by(id=task_id)
-        .first_or_404()
-    )
-    response = _ensure_owner(task, user_id)
-    if response:
-        return response
-
-    if not task.result or (
-        not (task.result.java_code or task.result.kotlin_code or task.result.generated_code)
-    ):
-        return jsonify({"message": "Task code not ready."}), 400
-
-    custom = _load_custom_code(task)
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        summary_lines = [
-            "# 无障碍图表任务打包说明",
-            "",
-            f"任务标题：{task.title}",
-            f"当前状态：{task.status}",
-            "",
-            "该压缩包包含 Java 与 Kotlin 两种语言的示例代码，以及集成步骤说明。",
-        ]
-        if task.result and task.result.summary:
-            summary_lines.append("")
-            summary_lines.append("图表摘要：")
-            summary_lines.append(task.result.summary)
-        archive.writestr("README.md", "\n".join(summary_lines))
-
-        java_source = custom.get("java") or task.result.java_code or ""
-        kotlin_source = custom.get("kotlin") or task.result.kotlin_code or ""
-        if not java_source and task.result.generated_code and task.language == "java":
-            java_source = task.result.generated_code
-        if not kotlin_source and task.result.generated_code and task.language == "kotlin":
-            kotlin_source = task.result.generated_code
-
-        if java_source:
-            archive.writestr("java/AccessibleChartActivity.java", java_source)
-        if kotlin_source:
-            archive.writestr("kotlin/AccessibleChartActivity.kt", kotlin_source)
-
-        integration = task.result.integration_doc or {}
-        java_steps = integration.get("java") or []
-        kotlin_steps = integration.get("kotlin") or []
-        archive.writestr(
-            "docs/java_integration.txt",
-            "\n".join(str(step) for step in java_steps) or "暂无集成说明。",
-        )
-        archive.writestr(
-            "docs/kotlin_integration.txt",
-            "\n".join(str(step) for step in kotlin_steps) or "暂无集成说明。",
-        )
-
-    buffer.seek(0)
-    filename = f"chart_task_{task.id}.zip"
-    return send_file(buffer, download_name=filename, as_attachment=True, mimetype="application/zip")
+    return jsonify({"missing": missing, "required": sorted(REQUIRED_TEMPLATE_PLACEHOLDERS)})

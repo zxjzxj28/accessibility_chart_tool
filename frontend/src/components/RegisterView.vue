@@ -5,10 +5,6 @@
       <p class="subtitle">加入平台，生成可复用的无障碍图表组件。</p>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
-          姓名
-          <input v-model="name" type="text" required placeholder="张三" />
-        </label>
-        <label>
           账号
           <input v-model="username" type="text" required placeholder="请输入账号名称" />
         </label>
@@ -43,7 +39,6 @@ import { useAuthStore } from '../stores/auth';
 const router = useRouter();
 const auth = useAuthStore();
 
-const name = ref('');
 const email = ref('');
 const username = ref('');
 const password = ref('');
@@ -57,7 +52,6 @@ const handleSubmit = async () => {
   message.value = '';
   try {
     await auth.register({
-      name: name.value,
       email: email.value,
       username: username.value,
       password: password.value

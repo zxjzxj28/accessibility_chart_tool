@@ -30,10 +30,11 @@ def create_app(config_name: str | None = None) -> Flask:
         db.create_all()
         if CodeTemplate.query.filter_by(is_system=True).count() == 0:
             default_content = (
-                "// ACT 默认模版\n"
+                "// ACT 默认模板\n"
                 "// 标题：{title}\n"
-                "// 摘要：{summary}\n\n"
-                "{generated_code}\n"
+                "// 摘要：{summary}\n"
+                "// 数据点：{data_points}\n"
+                "// 表格数据：{table_data}\n"
             )
             java_template = CodeTemplate(
                 name="默认模板 (Java)",

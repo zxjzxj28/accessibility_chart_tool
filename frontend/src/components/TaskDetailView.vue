@@ -1,112 +1,72 @@
 <template>
-  <div class="detail-page" v-if="task">
-    <header class="detail-header">
+  <div class="task-detail" v-if="task">
+    <header class="header">
       <div>
-        <button class="ghost" @click="goBack">← 返回仪表盘</button>
         <h1>{{ task.title }}</h1>
-        <div class="status" :class="task.status">{{ statusLabel }}</div>
+        <p class="muted">状态：{{ statusLabel(task.status) }} · 创建于 {{ formatDate(task.created_at) }}</p>
       </div>
-      <div class="header-actions">
-        <button class="primary" @click="regenerateCode" :disabled="regenerating">重新生成代码</button>
-        <button class="secondary" @click="refresh">刷新</button>
-        <button class="ghost" @click="downloadPackage">下载代码压缩包</button>
-      </div>
+      <router-link class="ghost" to="/">返回列表</router-link>
     </header>
 
-    <section class="info-grid">
-      <article class="card">
-        <h2>图表摘要</h2>
-        <p>{{ task.summary || '处理中完成后将显示摘要。' }}</p>
-        <div class="image-preview" v-if="task.image_path">
-          <img :src="imageSource" alt="图表预览" />
-        </div>
-      </article>
-      <article class="card">
-        <h2>数据点</h2>
-        <table v-if="task.table_data?.length">
-          <thead>
-            <tr>
-              <th>标签</th>
-              <th>数值</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in task.table_data" :key="row.label">
-              <td>{{ row.label }}</td>
-              <td>{{ row.value }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else class="muted">暂未生成结构化数据。</p>
-      </article>
+    <section class="card">
+      <h2>任务结果</h2>
+      <p v-if="task.status === 'queued' || task.status === 'processing'" class="muted">任务正在处理中，请稍后刷新。</p>
+      <p v-else-if="task.status === 'failed'" class="error">{{ task.result?.error_message || '处理失败' }}</p>
+      <template v-else>
+        <article class="summary" v-if="task.summary">
+          <h3>图表摘要</h3>
+          <p>{{ task.summary }}</p>
+        </article>
+        <article class="data-block" v-if="task.result?.data_points?.length">
+          <h3>数据点</h3>
+          <ul>
+            <li v-for="point in task.result.data_points" :key="point.id">
+              <strong>{{ point.label }}</strong>
+              <span>值：{{ point.value }}</span>
+              <span>描述：{{ point.description }}</span>
+            </li>
+          </ul>
+        </article>
+        <article class="data-block" v-if="task.result?.table_data?.length">
+          <h3>表格数据</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>标签</th>
+                <th>数值</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in task.result.table_data" :key="row.label">
+                <td>{{ row.label }}</td>
+                <td>{{ row.value }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </template>
     </section>
 
-    <section class="editor-grid">
-      <article class="card">
-        <header class="card-header">
-          <div>
-            <h2>Android 代码片段</h2>
-            <p class="muted">在模板和语言之间切换，必要时保存自定义代码。</p>
-          </div>
-          <div class="button-group">
-            <div class="language-tabs">
-              <button
-                type="button"
-                :class="{ active: activeLanguage === 'java' }"
-                @click="switchLanguage('java')"
-              >Java</button>
-              <button
-                type="button"
-                :class="{ active: activeLanguage === 'kotlin' }"
-                @click="switchLanguage('kotlin')"
-              >Kotlin</button>
-            </div>
-            <select class="template-select" v-model="selectedTemplates[activeLanguage]" @change="onTemplateChange">
-              <option value="">原始生成代码</option>
-              <option v-for="template in templatesByLanguage(activeLanguage)" :key="template.id" :value="String(template.id)">
-                {{ templateLabel(template) }}
-              </option>
-            </select>
-            <button class="ghost" @click="resetToGenerated">恢复生成代码</button>
-            <button class="primary" @click="saveCustomCode">保存自定义代码</button>
-          </div>
-        </header>
-        <textarea v-model="editedCode" spellcheck="false"></textarea>
-        <p v-if="templateMessage" class="info">{{ templateMessage }}</p>
-        <p v-if="saveMessage" class="info">{{ saveMessage }}</p>
-      </article>
-      <article class="card integration-card">
-        <header class="card-header">
-          <div>
-            <h2>集成说明</h2>
-            <p class="muted">根据语言选择相应步骤完成在 Android 项目中的落地。</p>
-          </div>
-        </header>
-        <div class="integration-block">
-          <h3>Java 集成步骤</h3>
-          <ol>
-            <li v-for="(step, index) in javaSteps" :key="`java-${index}`">{{ step }}</li>
-            <li v-if="!javaSteps.length" class="muted">暂无说明。</li>
-          </ol>
-        </div>
-        <div class="integration-block">
-          <h3>Kotlin 集成步骤</h3>
-          <ol>
-            <li v-for="(step, index) in kotlinSteps" :key="`kotlin-${index}`">{{ step }}</li>
-            <li v-if="!kotlinSteps.length" class="muted">暂无说明。</li>
-          </ol>
-        </div>
-        <p v-if="downloadMessage" class="info">{{ downloadMessage }}</p>
-      </article>
+    <section class="card">
+      <h2>模板渲染</h2>
+      <div class="template-controls">
+        <select v-model="selectedTemplateId">
+          <option value="">选择模板</option>
+          <option v-for="template in templates" :key="template.id" :value="String(template.id)">
+            {{ template.name }} · {{ template.language.toUpperCase() }}
+          </option>
+        </select>
+        <button class="primary" :disabled="!selectedTemplateId" @click="renderTemplate">渲染模板</button>
+      </div>
+      <pre v-if="renderedTemplate" class="rendered">{{ renderedTemplate }}</pre>
+      <p v-else class="muted">选择一个模板后即可查看格式化后的内容。</p>
     </section>
   </div>
-  <div v-else class="loading-state">
-    正在加载任务详情...
-  </div>
+  <p v-else class="muted">正在加载任务详情…</p>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
@@ -114,454 +74,169 @@ const route = useRoute();
 const router = useRouter();
 
 const task = ref(null);
-const editedCode = ref('');
-const activeLanguage = ref('java');
-const regenerating = ref(false);
-const saveMessage = ref('');
-const downloadMessage = ref('');
-const templateMessage = ref('');
 const templates = ref([]);
+const selectedTemplateId = ref('');
+const renderedTemplate = ref('');
 
-const selectedTemplates = reactive({ java: '', kotlin: '' });
-const templateCache = reactive({ java: new Map(), kotlin: new Map() });
-
-const statusLabels = {
-  pending: '排队中',
-  processing: '处理中',
-  completed: '已完成',
-  failed: '失败',
-  cancelled: '已取消'
-};
-
-const taskId = route.params.id;
-
-const fetchTemplates = async () => {
-  const { data } = await axios.get('/api/templates');
-  templates.value = data.items;
-};
-
-const templateLabel = (template) => `${template.name} · ${template.language.toUpperCase()}`;
-
-const templatesByLanguage = (language) => templates.value.filter((tpl) => tpl.language === language);
-
-const clearTemplateCache = () => {
-  templateCache.java.clear();
-  templateCache.kotlin.clear();
-};
-
-const fetchTask = async () => {
-  const { data } = await axios.get(`/api/tasks/${taskId}`);
-  task.value = data;
-  activeLanguage.value = data.template?.language || data.language || 'java';
-  initializeTemplateSelection();
-  await applyLanguageCode();
-};
-
-const initializeTemplateSelection = () => {
-  if (!task.value) return;
-  clearTemplateCache();
-  selectedTemplates.java = '';
-  selectedTemplates.kotlin = '';
-  if (task.value.template && task.value.template.language) {
-    selectedTemplates[task.value.template.language] = String(task.value.template.id);
-  }
-  const systemJava = templatesByLanguage('java').find((tpl) => tpl.is_system) || templatesByLanguage('java')[0];
-  const systemKotlin = templatesByLanguage('kotlin').find((tpl) => tpl.is_system) || templatesByLanguage('kotlin')[0];
-  if (!selectedTemplates.java && systemJava) {
-    selectedTemplates.java = String(systemJava.id);
-  }
-  if (!selectedTemplates.kotlin && systemKotlin) {
-    selectedTemplates.kotlin = String(systemKotlin.id);
+const statusLabel = (status) => {
+  switch (status) {
+    case 'queued':
+      return '排队中';
+    case 'processing':
+      return '处理中';
+    case 'completed':
+      return '已完成';
+    case 'failed':
+      return '失败';
+    case 'cancelled':
+      return '已取消';
+    default:
+      return status;
   }
 };
 
-const refresh = async () => {
-  await fetchTask();
-};
+const formatDate = (value) => new Date(value).toLocaleString();
 
-const saveCustomCode = async () => {
-  saveMessage.value = '';
+const loadTask = async () => {
   try {
-    await axios.post(`/api/tasks/${taskId}/custom-code`, {
-      language: activeLanguage.value,
-      code: editedCode.value
+    const { data } = await axios.get(`/api/tasks/${route.params.id}`);
+    task.value = data;
+  } catch (error) {
+    router.replace('/');
+  }
+};
+
+const loadTemplates = async () => {
+  try {
+    const { data } = await axios.get('/api/templates');
+    templates.value = data;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const renderTemplate = async () => {
+  if (!selectedTemplateId.value || !task.value) return;
+  try {
+    const { data } = await axios.get(`/api/tasks/${task.value.id}/render-template`, {
+      params: { template_id: selectedTemplateId.value }
     });
-    await fetchTask();
-    saveMessage.value = '自定义代码已保存。';
-  } catch (err) {
-    saveMessage.value = err.response?.data?.message || '保存失败，请稍后重试。';
-  }
-};
-
-const regenerateCode = async () => {
-  regenerating.value = true;
-  try {
-    await axios.post(`/api/tasks/${taskId}/regenerate-code`, { language: activeLanguage.value });
-    await fetchTask();
-    saveMessage.value = `已重新生成 ${activeLanguage.value === 'java' ? 'Java' : 'Kotlin'} 代码。`;
-  } catch (err) {
-    saveMessage.value = err.response?.data?.message || '重新生成失败，请稍后再试。';
-  } finally {
-    regenerating.value = false;
-  }
-};
-
-const resetToGenerated = () => {
-  selectedTemplates[activeLanguage.value] = '';
-  editedCode.value = getBaseCode(activeLanguage.value);
-  templateMessage.value = '';
-};
-
-const goBack = () => {
-  router.push('/');
-};
-
-const statusLabel = computed(() => statusLabels[task.value?.status] || task.value?.status || '');
-
-const javaSteps = computed(() => task.value?.integration_doc?.java || []);
-const kotlinSteps = computed(() => task.value?.integration_doc?.kotlin || []);
-
-const imageSource = computed(() => task.value?.image_url || '');
-
-const getBaseCode = (language) => {
-  if (!task.value) return '';
-  if (language === 'java') {
-    return task.value.java_code || '';
-  }
-  return task.value.kotlin_code || '';
-};
-
-const applyLanguageCode = async () => {
-  if (!task.value) return;
-  templateMessage.value = '';
-  const language = activeLanguage.value;
-  const custom = task.value.custom_code?.[language];
-  if (custom) {
-    editedCode.value = custom;
-    return;
-  }
-  const templateId = selectedTemplates[language];
-  if (templateId) {
-    await handleTemplateSelection(language, templateId, true);
-  } else {
-    editedCode.value = getBaseCode(language);
-  }
-};
-
-const handleTemplateSelection = async (language, templateId, fromApply = false) => {
-  if (!task.value) return;
-  if (!templateId) {
-    if (activeLanguage.value === language) {
-      editedCode.value = getBaseCode(language);
-    }
-    return;
-  }
-  if (task.value.status !== 'completed') {
-    if (activeLanguage.value === language) {
-      templateMessage.value = '任务尚未完成，无法应用模板。';
-    }
-    return;
-  }
-  const cache = templateCache[language];
-  if (cache.has(templateId)) {
-    if (activeLanguage.value === language) {
-      editedCode.value = cache.get(templateId);
-    }
-    return;
-  }
-  try {
-    const { data } = await axios.post(`/api/tasks/${taskId}/render-template`, { template_id: Number(templateId) });
-    cache.set(templateId, data.code);
-    if (activeLanguage.value === language) {
-      editedCode.value = data.code;
-      if (!fromApply) {
-        templateMessage.value = '';
-      }
-    }
-  } catch (err) {
-    const message = err.response?.data?.message || '模板渲染失败。';
-    if (activeLanguage.value === language) {
-      templateMessage.value = message;
-      editedCode.value = getBaseCode(language);
-    }
-  }
-};
-
-const onTemplateChange = async () => {
-  await applyLanguageCode();
-};
-
-const switchLanguage = async (language) => {
-  if (activeLanguage.value === language) return;
-  activeLanguage.value = language;
-  await applyLanguageCode();
-  saveMessage.value = '';
-};
-
-watch(
-  () => task.value?.custom_code,
-  async () => {
-    await applyLanguageCode();
-  }
-);
-
-watch(
-  () => activeLanguage.value,
-  async () => {
-    await applyLanguageCode();
-  }
-);
-
-watch(
-  () => selectedTemplates.java,
-  async () => {
-    if (!task.value) return;
-    if (activeLanguage.value === 'java') {
-      await applyLanguageCode();
-    } else if (selectedTemplates.java) {
-      await handleTemplateSelection('java', selectedTemplates.java);
-    }
-  }
-);
-
-watch(
-  () => selectedTemplates.kotlin,
-  async () => {
-    if (!task.value) return;
-    if (activeLanguage.value === 'kotlin') {
-      await applyLanguageCode();
-    } else if (selectedTemplates.kotlin) {
-      await handleTemplateSelection('kotlin', selectedTemplates.kotlin);
-    }
-  }
-);
-
-const downloadPackage = async () => {
-  downloadMessage.value = '';
-  try {
-    const response = await axios.get(`/api/tasks/${taskId}/download`, { responseType: 'blob' });
-    const blob = new Blob([response.data], { type: 'application/zip' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `task_${taskId}.zip`;
-    link.click();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    downloadMessage.value = err.response?.data?.message || '下载失败，请稍后再试。';
+    renderedTemplate.value = data.content;
+  } catch (error) {
+    renderedTemplate.value = error.response?.data?.message || '渲染失败';
   }
 };
 
 onMounted(async () => {
-  await fetchTemplates();
-  await fetchTask();
+  await Promise.all([loadTask(), loadTemplates()]);
 });
 </script>
 
 <style scoped>
-.detail-page {
-  padding: 32px 48px;
-  display: grid;
-  gap: 32px;
-  background: #f4f6fb;
-  min-height: 100vh;
+.task-detail {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.detail-header {
+.header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-}
-
-.detail-header h1 {
-  margin: 8px 0;
-  color: #102a43;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.info-grid {
-  display: grid;
-  gap: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-.editor-grid {
-  display: grid;
-  gap: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-}
-
-.card {
-  background: white;
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
-  display: grid;
-  gap: 16px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-}
-
-.button-group {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.card-header h2 {
-  margin: 0;
-  color: #243b53;
+  align-items: flex-start;
 }
 
 .muted {
-  color: #829ab1;
-  margin: 0;
+  color: #6b7280;
 }
 
-textarea {
-  width: 100%;
-  min-height: 340px;
+.error {
+  color: #b91c1c;
+}
+
+.card {
+  background: #fff;
   border-radius: 12px;
-  border: 1px solid #d9e2ec;
-  padding: 16px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.95rem;
-  background: #f8fafc;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
 }
 
-.language-tabs {
+.summary p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.data-block ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.language-tabs button {
-  border: 1px solid #d9e2ec;
-  background: #f8fafc;
-  color: #486581;
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-weight: 600;
+.data-block li {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+  display: grid;
+  gap: 4px;
 }
 
-.language-tabs button.active {
-  background: linear-gradient(135deg, #4c6ef5, #5f3dc4);
-  color: white;
-  border-color: #4c6ef5;
+.data-block table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.template-select {
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid #d9e2ec;
-  background: #f8fafc;
-  color: #364fc7;
-  font-weight: 600;
+.data-block th,
+.data-block td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
 }
 
-.integration-card {
+.template-controls {
+  display: flex;
   gap: 12px;
+  align-items: center;
 }
 
-.integration-block {
-  display: grid;
-  gap: 10px;
+.template-controls select {
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
 }
 
-.integration-block h3 {
-  margin: 0;
-  color: #243b53;
-}
-
-.integration-block ol {
-  margin: 0;
-  padding-left: 1.2rem;
-  display: grid;
-  gap: 6px;
-}
-
-.info {
-  color: #0f766e;
-  margin: 0;
-}
-
-.status {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.status.pending {
-  background: #fff7e6;
-  color: #f59f00;
-}
-
-.status.processing {
-  background: #e7f5ff;
-  color: #1c7ed6;
-}
-
-.status.completed {
-  background: #ebfbee;
-  color: #2f9e44;
-}
-
-.status.failed {
-  background: #fff5f5;
-  color: #e03131;
-}
-
-.status.cancelled {
-  background: #f1f3f5;
-  color: #868e96;
-}
-
-button.primary,
-button.secondary,
-button.ghost {
+.primary {
+  background: #2563eb;
+  color: #fff;
   border: none;
-  border-radius: 12px;
-  padding: 10px 18px;
-  font-weight: 600;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
 }
 
-button.primary {
-  background: linear-gradient(135deg, #4c6ef5, #5f3dc4);
-  color: white;
+.ghost {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-button.secondary {
-  background: #f1f5f9;
-  color: #3b5bdb;
-}
-
-button.ghost {
-  background: #f8fafc;
-  color: #486581;
-}
-
-button.primary:hover,
-button.secondary:hover,
-button.ghost:hover {
-  transform: translateY(-1px);
-}
-
-.loading-state {
-  padding: 32px;
-  text-align: center;
-  color: #486581;
+.rendered {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
 }
 </style>
