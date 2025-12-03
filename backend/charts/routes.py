@@ -307,8 +307,54 @@ def list_tasks():
 @jwt_required()
 def create_task():
     user_id = _current_user_id()
+    payload = request.get_json(silent=True) or {}
+    creation_mode = payload.get("mode")
+
+    if creation_mode == "metadata":
+        title = (payload.get("title") or "").strip()
+        if not title:
+            return jsonify({"message": "任务标题不能为空"}), 400
+
+        summary = (payload.get("summary") or "").strip()
+        if not summary:
+            return jsonify({"message": "请填写摘要内容"}), 400
+
+        application_name = (payload.get("application_name") or "").strip()
+        application_id = payload.get("application_id")
+        template_id = payload.get("template_id")
+
+        try:
+            application = _resolve_application(user_id, application_name, application_id)
+            template = _resolve_template(user_id, template_id)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+
+        task = ChartTask(
+            title=title,
+            status="completed",
+            user_id=user_id,
+            application=application,
+            image_path=None,
+            template=template,
+            ended_at=datetime.utcnow(),
+        )
+        db.session.add(task)
+        db.session.flush()
+
+        result = ChartTaskResult(
+            task=task,
+            is_success=True,
+            summary=summary,
+            data_points=payload.get("data_points") or [],
+            table_data=payload.get("table_data") or [],
+            error_message=None,
+        )
+        db.session.add(result)
+        db.session.commit()
+        return jsonify(task.to_dict()), 201
+
     if "file" not in request.files:
-        return jsonify({"message": "请上传图表图片"}), 400
+        return jsonify({"message": "请上传图表图片或提供图表元数据"}), 400
 
     file_storage = request.files["file"]
     if file_storage.filename == "":

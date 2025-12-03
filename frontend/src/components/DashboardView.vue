@@ -46,7 +46,25 @@
 
         <section class="card">
           <h2>创建新任务</h2>
-          <form class="upload-form" @submit.prevent="submitTask">
+          <div class="mode-tabs" role="tablist">
+            <button
+              role="tab"
+              :class="['mode-tab', { active: creationMode === 'upload' }]"
+              @click="creationMode = 'upload'"
+            >
+              上传图表图片
+            </button>
+            <button
+              role="tab"
+              :class="['mode-tab', { active: creationMode === 'metadata' }]"
+              @click="creationMode = 'metadata'"
+            >
+              输入图表元数据
+            </button>
+            <router-link class="link" to="/docs">查看接入说明</router-link>
+          </div>
+
+          <form v-if="creationMode === 'upload'" class="upload-form" @submit.prevent="submitTask">
             <label>
               任务标题
               <input v-model="title" type="text" placeholder="示例：季度销售趋势" required />
@@ -79,6 +97,60 @@
             </label>
             <button class="primary" type="submit" :disabled="uploading">
               {{ uploading ? '处理中…' : '开始转换' }}
+            </button>
+          </form>
+
+          <form v-else class="upload-form" @submit.prevent="submitTask">
+            <label>
+              任务标题
+              <input v-model="title" type="text" placeholder="示例：季度销售趋势" required />
+            </label>
+            <label>
+              应用名称
+              <input
+                v-model="applicationInput"
+                type="text"
+                list="application-options"
+                placeholder="可输入新名称或选择已有应用"
+              />
+              <datalist id="application-options">
+                <option v-for="app in applications" :key="app.id" :value="app.name"></option>
+              </datalist>
+              <span v-if="matchedUploadApp" class="hint">已选择应用：{{ matchedUploadApp.name }}</span>
+            </label>
+            <label>
+              代码模板
+              <select v-model="selectedTemplateId">
+                <option value="">默认模板</option>
+                <option v-for="template in templates" :key="template.id" :value="String(template.id)">
+                  {{ template.name }} · {{ template.language.toUpperCase() }}
+                </option>
+              </select>
+            </label>
+            <label>
+              摘要（必填）
+              <textarea
+                v-model="metadataForm.summary"
+                placeholder="示例：2024年一至四月销售趋势总体上升，峰值出现在四月，约五十一万。"
+                required
+              ></textarea>
+            </label>
+            <label>
+              数据点 JSON（可选）
+              <textarea
+                v-model="metadataForm.dataPointsText"
+                placeholder='[ {"id":1,"x":0.1,"y":0.72,"description":"一月 销售额 23.5 万"} ]'
+              ></textarea>
+            </label>
+            <label>
+              表格数据 JSON（可选）
+              <textarea
+                v-model="metadataForm.tableDataText"
+                placeholder='[ ["月份","销售额"], ["一月","23.5 万"] ]'
+              ></textarea>
+            </label>
+            <button class="primary" type="submit" :disabled="uploading">
+              {{ uploading ? '提交中…' : '保存元数据任务' }}
             </button>
           </form>
           <p v-if="uploadMessage" class="hint">{{ uploadMessage }}</p>
@@ -290,6 +362,7 @@ import { useAuthStore } from '../stores/auth';
 const auth = useAuthStore();
 const router = useRouter();
 
+const creationMode = ref('upload');
 const activeTab = ref('manage');
 
 const showPassword = ref(false);
@@ -308,6 +381,12 @@ const selectedTemplateId = ref('');
 const file = ref(null);
 const uploading = ref(false);
 const uploadMessage = ref('');
+
+const metadataForm = reactive({
+  summary: '',
+  dataPointsText: '',
+  tableDataText: ''
+});
 
 const selectedAppId = ref('');
 const selectedGroupId = ref(null);
@@ -490,32 +569,85 @@ const handleFile = (event) => {
 };
 
 const submitTask = async () => {
-  if (!file.value) return;
+  const trimmedTitle = title.value.trim();
+  if (!trimmedTitle) {
+    uploadMessage.value = '任务标题不能为空';
+    return;
+  }
+
   try {
     uploading.value = true;
     uploadMessage.value = '';
-    const formData = new FormData();
-    formData.append('title', title.value.trim());
-    formData.append('file', file.value);
-    if (selectedTemplateId.value) {
-      formData.append('template_id', selectedTemplateId.value);
+
+    if (creationMode.value === 'upload') {
+      if (!file.value) {
+        uploadMessage.value = '请先选择图表图片。';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('title', trimmedTitle);
+      formData.append('file', file.value);
+      if (selectedTemplateId.value) {
+        formData.append('template_id', selectedTemplateId.value);
+      }
+      if (matchedUploadApp.value) {
+        formData.append('application_id', String(matchedUploadApp.value.id));
+      } else if (applicationInput.value.trim()) {
+        formData.append('application_name', applicationInput.value.trim());
+      }
+
+      await axios.post('/api/tasks', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      uploadMessage.value = '任务已创建，正在排队处理。';
+      file.value = null;
+    } else {
+      const parseJsonField = (text, fallback) => {
+        const content = (text || '').trim();
+        if (!content) return fallback;
+        try {
+          return JSON.parse(content);
+        } catch (err) {
+          throw new Error('JSON 解析失败，请检查格式。');
+        }
+      };
+
+      const payload = {
+        mode: 'metadata',
+        title: trimmedTitle,
+        summary: metadataForm.summary.trim(),
+        data_points: parseJsonField(metadataForm.dataPointsText, []),
+        table_data: parseJsonField(metadataForm.tableDataText, [])
+      };
+
+      if (!payload.summary) {
+        uploadMessage.value = '请填写摘要内容。';
+        return;
+      }
+
+      if (selectedTemplateId.value) {
+        payload.template_id = selectedTemplateId.value;
+      }
+      if (matchedUploadApp.value) {
+        payload.application_id = String(matchedUploadApp.value.id);
+      } else if (applicationInput.value.trim()) {
+        payload.application_name = applicationInput.value.trim();
+      }
+
+      await axios.post('/api/tasks', payload);
+      uploadMessage.value = '已保存元数据任务，结果可直接查看。';
+      metadataForm.summary = '';
+      metadataForm.dataPointsText = '';
+      metadataForm.tableDataText = '';
     }
-    if (matchedUploadApp.value) {
-      formData.append('application_id', String(matchedUploadApp.value.id));
-    } else if (applicationInput.value.trim()) {
-      formData.append('application_name', applicationInput.value.trim());
-    }
-    const { data } = await axios.post('/api/tasks', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    uploadMessage.value = '任务已创建，正在排队处理。';
+
     title.value = '';
     applicationInput.value = '';
     selectedTemplateId.value = '';
-    file.value = null;
     await Promise.all([loadApplications(), loadTasks(1)]);
   } catch (error) {
-    uploadMessage.value = error.response?.data?.message || '创建失败，请稍后再试。';
+    uploadMessage.value = error.response?.data?.message || error.message || '创建失败，请稍后再试。';
   } finally {
     uploading.value = false;
   }
@@ -830,6 +962,16 @@ onMounted(async () => {
   gap: 16px;
 }
 
+.upload-form textarea {
+  width: 100%;
+  min-height: 96px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
 .file-input {
   display: block;
   border: 1px dashed #94a3b8;
@@ -854,6 +996,34 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
   align-items: end;
+}
+
+.mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mode-tab {
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #1f2937;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mode-tab.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.mode-tab:not(.active):hover {
+  background: #e5edff;
 }
 
 .filter-grid label {
