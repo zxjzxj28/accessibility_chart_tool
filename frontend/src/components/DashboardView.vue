@@ -310,6 +310,7 @@ const uploading = ref(false);
 const uploadMessage = ref('');
 
 const selectedAppId = ref('');
+const selectedGroupId = ref(null);
 const selectedStatus = ref('');
 const taskName = ref('');
 const createdStart = ref('');
