@@ -23,14 +23,11 @@
         <button class="nav-item" :class="{ active: activeTab === 'history' }" @click="setActiveTab('history')">
           历史任务
         </button>
-        <button class="nav-item" :class="{ active: activeTab === 'applications' }" @click="setActiveTab('applications')">
-          应用管理
-        </button>
       </nav>
 
       <section class="sidebar-hint card">
         <h3>快速提示</h3>
-        <p class="hint">在历史任务中可通过应用、状态、时间范围精准定位任务；应用管理支持快速新建或重命名。</p>
+        <p class="hint">在历史任务中可通过状态、名称及时间范围精准定位任务。</p>
       </section>
     </aside>
 
@@ -66,21 +63,8 @@
 
           <form v-if="creationMode === 'upload'" class="upload-form" @submit.prevent="submitTask">
             <label>
-              任务标题
-              <input v-model="title" type="text" placeholder="示例：季度销售趋势" required />
-            </label>
-            <label>
-              应用名称
-              <input
-                v-model="applicationInput"
-                type="text"
-                list="application-options"
-                placeholder="可输入新名称或选择已有应用"
-              />
-              <datalist id="application-options">
-                <option v-for="app in applications" :key="app.id" :value="app.name"></option>
-              </datalist>
-              <span v-if="matchedUploadApp" class="hint">已选择应用：{{ matchedUploadApp.name }}</span>
+              任务名称
+              <input v-model="taskNameInput" type="text" placeholder="示例：季度销售趋势" required />
             </label>
             <label>
               代码模板
@@ -102,21 +86,8 @@
 
           <form v-else class="upload-form" @submit.prevent="submitTask">
             <label>
-              任务标题
-              <input v-model="title" type="text" placeholder="示例：季度销售趋势" required />
-            </label>
-            <label>
-              应用名称
-              <input
-                v-model="applicationInput"
-                type="text"
-                list="application-options"
-                placeholder="可输入新名称或选择已有应用"
-              />
-              <datalist id="application-options">
-                <option v-for="app in applications" :key="app.id" :value="app.name"></option>
-              </datalist>
-              <span v-if="matchedUploadApp" class="hint">已选择应用：{{ matchedUploadApp.name }}</span>
+              任务名称
+              <input v-model="taskNameInput" type="text" placeholder="示例：季度销售趋势" required />
             </label>
             <label>
               代码模板
@@ -161,21 +132,12 @@
         <header class="content-header history-header">
           <div>
             <h1>任务总览</h1>
-            <p class="muted">按应用、状态、名称及时间范围筛选任务，快速查看处理进度。</p>
+            <p class="muted">按状态、名称及时间范围筛选任务，快速查看处理进度。</p>
           </div>
         </header>
 
         <section class="card history-filters">
           <form class="filter-grid" @submit.prevent="applyFilters">
-            <label>
-              应用
-              <select v-model="selectedAppId">
-                <option value="">全部应用</option>
-                <option v-for="app in applications" :key="`filter-app-${app.id}`" :value="String(app.id)">
-                  {{ app.name }}
-                </option>
-              </select>
-            </label>
             <label>
               任务状态
               <select v-model="selectedStatus">
@@ -202,12 +164,12 @@
               <input v-model="createdEnd" type="date" />
             </label>
             <label>
-              结束时间（起）
-              <input v-model="endedStart" type="date" />
+              更新时间（起）
+              <input v-model="updatedStart" type="date" />
             </label>
             <label>
-              结束时间（止）
-              <input v-model="endedEnd" type="date" />
+              更新时间（止）
+              <input v-model="updatedEnd" type="date" />
             </label>
             <div class="filter-actions">
               <button class="primary" type="submit">查询</button>
@@ -220,31 +182,26 @@
           <table class="task-table">
             <thead>
               <tr>
-                <th>应用</th>
                 <th>任务名称</th>
                 <th>状态</th>
                 <th>创建时间</th>
-                <th>结束时间</th>
+                <th>更新时间</th>
                 <th>摘要</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="task in tasks" :key="task.id">
-                <td>{{ task.application?.name || '—' }}</td>
                 <td class="task-title">
                   <div class="title-cell">
-                    <span class="task-name">{{ task.title }}</span>
-                    <span v-if="task.image_url" class="preview">
-                      <img :src="task.image_url" alt="任务图片" />
-                    </span>
+                    <span class="task-name">{{ task.name }}</span>
                   </div>
                 </td>
                 <td>
-                  <span class="status-badge" :class="task.status">{{ statusLabel(task.status) }}</span>
+                  <span class="status-badge" :class="`status-${task.status}`">{{ statusLabel(task.status) }}</span>
                 </td>
                 <td>{{ formatDate(task.created_at) }}</td>
-                <td>{{ formatDate(task.ended_at) }}</td>
+                <td>{{ formatDate(task.updated_at) }}</td>
                 <td class="summary">{{ task.summary || '—' }}</td>
                 <td class="actions">
                   <router-link :to="`/tasks/${task.id}`" class="link">详情</router-link>
@@ -254,7 +211,7 @@
                 </td>
               </tr>
               <tr v-if="!tasks.length">
-                <td class="empty" colspan="7">暂无符合条件的任务</td>
+                <td class="empty" colspan="6">暂无符合条件的任务</td>
               </tr>
             </tbody>
           </table>
@@ -274,48 +231,6 @@
         </section>
       </template>
 
-      <template v-else>
-        <header class="content-header">
-          <div>
-            <h1>应用管理</h1>
-            <p class="muted">创建、重命名或删除应用，删除操作会同时移除该应用下的全部任务。</p>
-          </div>
-        </header>
-
-        <section class="card app-form">
-          <form @submit.prevent="createApplication">
-            <input v-model="newApplicationName" type="text" placeholder="输入新应用名称" required />
-            <button class="primary" type="submit">创建应用</button>
-          </form>
-        </section>
-
-        <section class="card app-table">
-          <table>
-            <thead>
-              <tr>
-                <th>应用名称</th>
-                <th>任务数量</th>
-                <th>创建时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="app in applications" :key="`manage-app-${app.id}`">
-                <td>{{ app.name }}</td>
-                <td>{{ app.task_count }}</td>
-                <td>{{ formatDate(app.created_at) }}</td>
-                <td class="actions">
-                  <button class="link" @click="renameApplication(app)">重命名</button>
-                  <button class="ghost" @click="deleteApplication(app)">删除</button>
-                </td>
-              </tr>
-              <tr v-if="!applications.length">
-                <td class="empty" colspan="4">尚未创建任何应用</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-      </template>
     </main>
 
     <div v-if="editor.visible" class="dialog-backdrop" @click.self="closeEditor">
@@ -323,16 +238,8 @@
         <h3>编辑任务</h3>
         <form @submit.prevent="saveEditor">
           <label>
-            任务标题
-            <input v-model="editor.title" type="text" required />
-          </label>
-          <label>
-            应用
-            <select v-model="editor.app_id">
-              <option v-for="app in applications" :key="`editor-app-${app.id}`" :value="String(app.id)">
-                {{ app.name }}
-              </option>
-            </select>
+            任务名称
+            <input v-model="editor.name" type="text" required />
           </label>
           <label>
             模板
@@ -354,7 +261,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
@@ -370,13 +277,11 @@ const passwordForm = reactive({ current_password: '', new_password: '' });
 const passwordLoading = ref(false);
 const passwordMessage = ref('');
 
-const applications = ref([]);
 const templates = ref([]);
 const tasks = ref([]);
 const pagination = reactive({ page: 1, pages: 1, total: 0 });
 
-const title = ref('');
-const applicationInput = ref('');
+const taskNameInput = ref('');
 const selectedTemplateId = ref('');
 const file = ref(null);
 const uploading = ref(false);
@@ -388,39 +293,28 @@ const metadataForm = reactive({
   tableDataText: ''
 });
 
-const selectedAppId = ref('');
-const selectedGroupId = ref(null);
 const selectedStatus = ref('');
 const taskName = ref('');
 const createdStart = ref('');
 const createdEnd = ref('');
-const endedStart = ref('');
-const endedEnd = ref('');
-
-const newApplicationName = ref('');
+const updatedStart = ref('');
+const updatedEnd = ref('');
 
 const editor = reactive({
   visible: false,
   taskId: null,
-  title: '',
-  app_id: '',
+  name: '',
   template_id: ''
 });
 
 const statusOptions = [
   { value: '', label: '全部状态' },
-  { value: 'queued', label: '排队中' },
-  { value: 'processing', label: '处理中' },
-  { value: 'completed', label: '已完成' },
-  { value: 'failed', label: '失败' },
-  { value: 'cancelled', label: '已取消' }
+  { value: 0, label: '排队中' },
+  { value: 1, label: '处理中' },
+  { value: 2, label: '已完成' },
+  { value: 3, label: '失败' },
+  { value: 4, label: '已取消' }
 ];
-
-const matchedUploadApp = computed(() => {
-  const name = applicationInput.value.trim().toLowerCase();
-  if (!name) return null;
-  return applications.value.find((app) => app.name.toLowerCase() === name) || null;
-});
 
 const formatDate = (value) => {
   if (!value) return '—';
@@ -430,39 +324,29 @@ const formatDate = (value) => {
 };
 
 const statusLabel = (status) => {
-  switch (status) {
-    case 'queued':
-      return '排队中';
-    case 'processing':
-      return '处理中';
-    case 'completed':
-      return '已完成';
-    case 'failed':
-      return '失败';
-    case 'cancelled':
-      return '已取消';
-    default:
-      return status || '未知';
-  }
+  const mapping = {
+    0: '排队中',
+    1: '处理中',
+    2: '已完成',
+    3: '失败',
+    4: '已取消'
+  };
+  const key = Number(status);
+  return mapping[key] || '未知';
 };
 
-const canCancel = (status) => ['queued', 'processing'].includes(status);
+const canCancel = (status) => [0, 1].includes(Number(status));
 
 const setActiveTab = (tab) => {
   if (activeTab.value === tab) {
     if (tab === 'history') {
       loadTasks(1);
-    } else if (tab === 'applications') {
-      loadApplications();
     }
     return;
   }
   activeTab.value = tab;
   if (tab === 'history') {
     loadTasks(1);
-  }
-  if (tab === 'applications') {
-    loadApplications();
   }
 };
 
@@ -490,27 +374,6 @@ const logout = () => {
   router.push('/login');
 };
 
-const loadApplications = async () => {
-  try {
-    const { data } = await axios.get('/api/applications');
-    applications.value = data;
-    if (selectedAppId.value) {
-      const exists = data.some((app) => String(app.id) === selectedAppId.value);
-      if (!exists) {
-        selectedAppId.value = '';
-      }
-    }
-    if (editor.visible) {
-      const exists = data.some((app) => String(app.id) === editor.app_id);
-      if (!exists && data.length) {
-        editor.app_id = String(data[0].id);
-      }
-    }
-  } catch (error) {
-    console.error(error);
-  }
-};
-
 const loadTemplates = async () => {
   try {
     const { data } = await axios.get('/api/templates');
@@ -528,17 +391,16 @@ const buildDateParam = (value, endOfDay = false) => {
 const loadTasks = async (page = pagination.page) => {
   try {
     const params = { page };
-    if (selectedAppId.value) params.app_id = Number(selectedAppId.value);
-    if (selectedStatus.value) params.status = selectedStatus.value;
+    if (selectedStatus.value !== '') params.status = Number(selectedStatus.value);
     if (taskName.value.trim()) params.task_name = taskName.value.trim();
     const createdFrom = buildDateParam(createdStart.value);
     const createdTo = buildDateParam(createdEnd.value, true);
-    const endedFrom = buildDateParam(endedStart.value);
-    const endedTo = buildDateParam(endedEnd.value, true);
+    const updatedFrom = buildDateParam(updatedStart.value);
+    const updatedTo = buildDateParam(updatedEnd.value, true);
     if (createdFrom) params.created_from = createdFrom;
     if (createdTo) params.created_to = createdTo;
-    if (endedFrom) params.ended_from = endedFrom;
-    if (endedTo) params.ended_to = endedTo;
+    if (updatedFrom) params.updated_from = updatedFrom;
+    if (updatedTo) params.updated_to = updatedTo;
     const { data } = await axios.get('/api/tasks', { params });
     tasks.value = data.items;
     pagination.page = data.page;
@@ -554,13 +416,12 @@ const applyFilters = () => {
 };
 
 const resetFilters = () => {
-  selectedAppId.value = '';
   selectedStatus.value = '';
   taskName.value = '';
   createdStart.value = '';
   createdEnd.value = '';
-  endedStart.value = '';
-  endedEnd.value = '';
+  updatedStart.value = '';
+  updatedEnd.value = '';
 };
 
 const handleFile = (event) => {
@@ -569,9 +430,9 @@ const handleFile = (event) => {
 };
 
 const submitTask = async () => {
-  const trimmedTitle = title.value.trim();
-  if (!trimmedTitle) {
-    uploadMessage.value = '任务标题不能为空';
+  const trimmedName = taskNameInput.value.trim();
+  if (!trimmedName) {
+    uploadMessage.value = '任务名称不能为空';
     return;
   }
 
@@ -586,15 +447,10 @@ const submitTask = async () => {
       }
 
       const formData = new FormData();
-      formData.append('title', trimmedTitle);
+      formData.append('name', trimmedName);
       formData.append('file', file.value);
       if (selectedTemplateId.value) {
         formData.append('template_id', selectedTemplateId.value);
-      }
-      if (matchedUploadApp.value) {
-        formData.append('application_id', String(matchedUploadApp.value.id));
-      } else if (applicationInput.value.trim()) {
-        formData.append('application_name', applicationInput.value.trim());
       }
 
       await axios.post('/api/tasks', formData, {
@@ -615,7 +471,7 @@ const submitTask = async () => {
 
       const payload = {
         mode: 'metadata',
-        title: trimmedTitle,
+        name: trimmedName,
         summary: metadataForm.summary.trim(),
         data_points: parseJsonField(metadataForm.dataPointsText, []),
         table_data: parseJsonField(metadataForm.tableDataText, [])
@@ -629,11 +485,6 @@ const submitTask = async () => {
       if (selectedTemplateId.value) {
         payload.template_id = selectedTemplateId.value;
       }
-      if (matchedUploadApp.value) {
-        payload.application_id = String(matchedUploadApp.value.id);
-      } else if (applicationInput.value.trim()) {
-        payload.application_name = applicationInput.value.trim();
-      }
 
       await axios.post('/api/tasks', payload);
       uploadMessage.value = '已保存元数据任务，结果可直接查看。';
@@ -642,10 +493,9 @@ const submitTask = async () => {
       metadataForm.tableDataText = '';
     }
 
-    title.value = '';
-    applicationInput.value = '';
+    taskNameInput.value = '';
     selectedTemplateId.value = '';
-    await Promise.all([loadApplications(), loadTasks(1)]);
+    await loadTasks(1);
   } catch (error) {
     uploadMessage.value = error.response?.data?.message || error.message || '创建失败，请稍后再试。';
   } finally {
@@ -656,38 +506,31 @@ const submitTask = async () => {
 const openEditor = (task) => {
   editor.visible = true;
   editor.taskId = task.id;
-  editor.title = task.title;
-  editor.app_id = task.app_id ? String(task.app_id) : (applications.value[0] ? String(applications.value[0].id) : '');
+  editor.name = task.name;
   editor.template_id = task.template?.id ? String(task.template.id) : '';
 };
 
 const closeEditor = () => {
   editor.visible = false;
   editor.taskId = null;
-  editor.title = '';
-  editor.app_id = '';
+  editor.name = '';
   editor.template_id = '';
 };
 
 const saveEditor = async () => {
   if (!editor.taskId) return;
-  const trimmedTitle = editor.title.trim();
-  if (!trimmedTitle) {
-    window.alert('任务标题不能为空');
-    return;
-  }
-  if (!editor.app_id) {
-    window.alert('请选择应用');
+  const trimmedName = editor.name.trim();
+  if (!trimmedName) {
+    window.alert('任务名称不能为空');
     return;
   }
   try {
     const payload = {
-      title: trimmedTitle,
-      app_id: Number(editor.app_id),
+      name: trimmedName,
       template_id: editor.template_id ? Number(editor.template_id) : null
     };
     await axios.patch(`/api/tasks/${editor.taskId}`, payload);
-    await Promise.all([loadApplications(), loadTasks()]);
+    await loadTasks();
     closeEditor();
   } catch (error) {
     window.alert(error.response?.data?.message || '保存失败');
@@ -697,7 +540,7 @@ const saveEditor = async () => {
 const cancelTask = async (taskId) => {
   try {
     await axios.post(`/api/tasks/${taskId}/cancel`);
-    await Promise.all([loadTasks(), loadApplications()]);
+    await loadTasks();
   } catch (error) {
     window.alert(error.response?.data?.message || '取消失败');
   }
@@ -707,52 +550,7 @@ const deleteTask = async (taskId) => {
   if (!window.confirm('确认删除该任务？删除后不可恢复。')) return;
   try {
     await axios.delete(`/api/tasks/${taskId}`);
-    await Promise.all([loadTasks(), loadApplications()]);
-  } catch (error) {
-    window.alert(error.response?.data?.message || '删除失败');
-  }
-};
-
-const createApplication = async () => {
-  const name = newApplicationName.value.trim();
-  if (!name) return;
-  try {
-    await axios.post('/api/applications', { name });
-    newApplicationName.value = '';
-    await loadApplications();
-    if (activeTab.value === 'history') {
-      await loadTasks(1);
-    }
-  } catch (error) {
-    window.alert(error.response?.data?.message || '创建失败');
-  }
-};
-
-const renameApplication = async (app) => {
-  const name = window.prompt('新的应用名称', app.name);
-  if (!name || !name.trim()) return;
-  try {
-    await axios.patch(`/api/applications/${app.id}`, { name: name.trim() });
-    await loadApplications();
-    if (activeTab.value === 'history') {
-      await loadTasks(1);
-    }
-  } catch (error) {
-    window.alert(error.response?.data?.message || '重命名失败');
-  }
-};
-
-const deleteApplication = async (app) => {
-  if (!window.confirm(`确认删除应用「${app.name}」及其全部任务？`)) return;
-  try {
-    await axios.delete(`/api/applications/${app.id}`);
-    if (selectedAppId.value === String(app.id)) {
-      selectedAppId.value = '';
-    }
-    await loadApplications();
-    if (activeTab.value === 'history') {
-      await loadTasks(1);
-    }
+    await loadTasks();
   } catch (error) {
     window.alert(error.response?.data?.message || '删除失败');
   }
@@ -775,29 +573,8 @@ onUnmounted(() => {
   }
 });
 
-watch([selectedAppId, selectedStatus, createdStart, createdEnd, endedStart, endedEnd], () => {
+watch([selectedStatus, createdStart, createdEnd, updatedStart, updatedEnd], () => {
   scheduleFilterLoad();
-});
-
-watch(selectedAppId, (value, oldValue) => {
-  if (!value) {
-    selectedGroupId.value = null;
-  } else if (value !== oldValue) {
-    const app = applications.value.find((item) => item.id === value);
-    const groupExists = app?.flattenedGroups.some((group) => group.id === selectedGroupId.value);
-    if (!groupExists) {
-      selectedGroupId.value = null;
-    }
-  }
-  if (value !== oldValue) {
-    scheduleFilterLoad();
-  }
-});
-
-watch(selectedGroupId, (value, oldValue) => {
-  if (value !== oldValue) {
-    scheduleFilterLoad();
-  }
 });
 
 onMounted(async () => {
@@ -805,7 +582,7 @@ onMounted(async () => {
     router.push('/login');
     return;
   }
-  await Promise.all([loadApplications(), loadTemplates(), loadTasks()]);
+  await Promise.all([loadTemplates(), loadTasks()]);
 });
 </script>
 
@@ -890,8 +667,7 @@ onMounted(async () => {
 .filter-grid input,
 .filter-grid select,
 .dialog input,
-.dialog select,
-.app-form input {
+.dialog select {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 6px;
@@ -1101,27 +877,27 @@ onMounted(async () => {
   text-transform: uppercase;
 }
 
-.status-badge.queued {
+.status-badge.status-0 {
   background: rgba(59, 130, 246, 0.15);
   color: #1d4ed8;
 }
 
-.status-badge.processing {
-  background: rgba(16, 185, 129, 0.15);
-  color: #047857;
+.status-badge.status-1 {
+  background: rgba(234, 179, 8, 0.18);
+  color: #b45309;
 }
 
-.status-badge.completed {
-  background: rgba(99, 102, 241, 0.15);
-  color: #4c1d95;
+.status-badge.status-2 {
+  background: rgba(16, 185, 129, 0.16);
+  color: #0f766e;
 }
 
-.status-badge.failed {
+.status-badge.status-3 {
   background: rgba(239, 68, 68, 0.15);
   color: #b91c1c;
 }
 
-.status-badge.cancelled {
+.status-badge.status-4 {
   background: rgba(148, 163, 184, 0.2);
   color: #475569;
 }
@@ -1150,28 +926,6 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   color: #475569;
-}
-
-.app-form form {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.app-form button {
-  flex-shrink: 0;
-}
-
-.app-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.app-table th,
-.app-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #e2e8f0;
-  text-align: left;
 }
 
 .dialog-backdrop {
