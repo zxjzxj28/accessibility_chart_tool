@@ -31,8 +31,20 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-    tasks = db.relationship("ChartTask", backref="user", lazy=True)
-    templates = db.relationship("CodeTemplate", backref="owner", lazy=True)
+    tasks = db.relationship(
+        "ChartTask",
+        primaryjoin="User.id==ChartTask.user_id",
+        back_populates="user",
+        lazy=True,
+        foreign_keys="ChartTask.user_id",
+    )
+    templates = db.relationship(
+        "CodeTemplate",
+        primaryjoin="User.id==CodeTemplate.user_id",
+        back_populates="owner",
+        lazy=True,
+        foreign_keys="CodeTemplate.user_id",
+    )
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -56,8 +68,8 @@ class ChartTask(db.Model):
     name = db.Column(db.String(255), nullable=False)
     type = db.Column(db.SmallInteger, nullable=False, default=TaskType.UPLOAD.value)
     status = db.Column(db.SmallInteger, nullable=False, default=TaskStatus.QUEUED.value)
-    user_id = db.Column(db.BigInteger, db.ForeignKey("users.id"), nullable=False)
-    template_id = db.Column(db.BigInteger, db.ForeignKey("templates.id"), nullable=True)
+    user_id = db.Column(db.BigInteger, nullable=False)
+    template_id = db.Column(db.BigInteger, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -70,6 +82,24 @@ class ChartTask(db.Model):
         cascade="all, delete-orphan",
         lazy=True,
         uselist=False,
+        primaryjoin="ChartTask.id==ChartTaskResult.task_id",
+        foreign_keys="ChartTaskResult.task_id",
+    )
+
+    user = db.relationship(
+        "User",
+        primaryjoin="ChartTask.user_id==User.id",
+        back_populates="tasks",
+        lazy=True,
+        foreign_keys=[user_id],
+    )
+
+    template = db.relationship(
+        "CodeTemplate",
+        primaryjoin="ChartTask.template_id==CodeTemplate.id",
+        back_populates="tasks",
+        lazy=True,
+        foreign_keys=[template_id],
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -99,15 +129,19 @@ class ChartTaskResult(db.Model):
     __tablename__ = "task_results"
 
     id = db.Column(db.BigInteger, primary_key=True)
-    task_id = db.Column(
-        db.BigInteger, db.ForeignKey("tasks.id"), nullable=False, unique=True
-    )
+    task_id = db.Column(db.BigInteger, nullable=False, unique=True)
     is_success = db.Column(db.Boolean, default=False, nullable=False)
     summary = db.Column(db.Text, nullable=True)
     data_points = db.Column(db.JSON, nullable=True)
     table_data = db.Column(db.JSON, nullable=True)
     error_message = db.Column(db.Text, nullable=True)
-    task = db.relationship("ChartTask", back_populates="result", lazy=True)
+    task = db.relationship(
+        "ChartTask",
+        primaryjoin="ChartTaskResult.task_id==ChartTask.id",
+        back_populates="result",
+        lazy=True,
+        foreign_keys=[task_id],
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -129,12 +163,26 @@ class CodeTemplate(db.Model):
     language = db.Column(db.String(50), nullable=False)
     content = db.Column(db.Text, nullable=False)
     is_system = db.Column(db.Boolean, default=False, nullable=False)
-    user_id = db.Column(db.BigInteger, db.ForeignKey("users.id"), nullable=True)
+    user_id = db.Column(db.BigInteger, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
-    tasks = db.relationship("ChartTask", backref="template", lazy=True)
+    tasks = db.relationship(
+        "ChartTask",
+        primaryjoin="CodeTemplate.id==ChartTask.template_id",
+        back_populates="template",
+        lazy=True,
+        foreign_keys="ChartTask.template_id",
+    )
+
+    owner = db.relationship(
+        "User",
+        primaryjoin="CodeTemplate.user_id==User.id",
+        back_populates="templates",
+        lazy=True,
+        foreign_keys=[user_id],
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
