@@ -202,14 +202,15 @@ fetchTemplates().catch(() => {
 }
 
 .muted {
-  color: #6b7280;
+  color: #5b6472;
 }
 
 .card {
   background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -229,7 +230,7 @@ fetchTemplates().catch(() => {
 
 .template-item {
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -261,10 +262,11 @@ fetchTemplates().catch(() => {
 input,
 select,
 textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 0.95rem;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.96rem;
+  background: #fbfcff;
 }
 
 textarea {
@@ -272,26 +274,28 @@ textarea {
 }
 
 .primary {
-  background: #2563eb;
+  background: linear-gradient(90deg, #1f3c88, #274690);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 10px;
+  padding: 9px 16px;
   cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 12px 26px rgba(31, 60, 136, 0.18);
 }
 
 .ghost {
-  background: none;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  padding: 7px 12px;
   cursor: pointer;
 }
 
 .link {
   background: none;
   border: none;
-  color: #2563eb;
+  color: #1f3c88;
   cursor: pointer;
   padding: 0;
 }
