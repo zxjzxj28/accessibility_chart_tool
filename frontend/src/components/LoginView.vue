@@ -4,21 +4,17 @@
       <h1>无障碍图表工具</h1>
       <p class="subtitle">登录以管理你的无障碍图表转换任务。</p>
       <form @submit.prevent="handleSubmit" class="form">
-        <div class="toggle-group">
-          <button type="button" :class="{ active: mode === 'email' }" @click="mode = 'email'">邮箱登录</button>
-          <button type="button" :class="{ active: mode === 'account' }" @click="mode = 'account'">账号登录</button>
-        </div>
-        <label v-if="mode === 'email'">
-          邮箱
-          <input v-model="identifier" type="email" required placeholder="请输入邮箱地址" />
-        </label>
-        <label v-else>
+        <label>
           账号
           <input v-model="identifier" type="text" required placeholder="请输入账号名称" />
         </label>
         <label>
           密码
           <input v-model="password" type="password" required placeholder="••••••••" />
+        </label>
+        <label class="remember-line">
+          <input v-model="rememberAccount" type="checkbox" />
+          记住账号
         </label>
         <button type="submit" :disabled="loading">
           <span v-if="loading">正在登录...</span>
@@ -35,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
@@ -47,14 +43,27 @@ const identifier = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
-const mode = ref('email');
+const rememberAccount = ref(false);
+
+onMounted(() => {
+  const stored = localStorage.getItem('rememberedAccount');
+  if (stored) {
+    identifier.value = stored;
+    rememberAccount.value = true;
+  }
+});
 
 const handleSubmit = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const value = mode.value === 'email' ? identifier.value.trim().toLowerCase() : identifier.value.trim();
+    const value = identifier.value.trim();
     await auth.login({ identifier: value, password: password.value });
+    if (rememberAccount.value) {
+      localStorage.setItem('rememberedAccount', value);
+    } else {
+      localStorage.removeItem('rememberedAccount');
+    }
     const redirect = route.query.redirect || '/';
     router.push(redirect);
   } catch (err) {
@@ -86,37 +95,18 @@ h1 {
   margin: 0;
   font-size: 1.8rem;
   color: #102a43;
+  text-align: center;
 }
 
 .subtitle {
-  margin: 8px 0 24px;
+  margin: 10px 0 26px;
   color: #829ab1;
+  text-align: center;
 }
 
 .form {
   display: grid;
   gap: 18px;
-}
-
-.toggle-group {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.toggle-group button {
-  border: 1px solid #d9e2ec;
-  background: #f8fafc;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-weight: 600;
-  color: #486581;
-}
-
-.toggle-group button.active {
-  background: linear-gradient(135deg, #4c6ef5, #2b8aeb);
-  color: white;
-  border-color: #4c6ef5;
 }
 
 label {
@@ -139,6 +129,19 @@ input:focus {
   outline: none;
   border-color: #4c6ef5;
   box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.2);
+}
+
+.remember-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #243b53;
+}
+
+.remember-line input {
+  width: 16px;
+  height: 16px;
 }
 
 button {
