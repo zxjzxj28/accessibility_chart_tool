@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from typing import List
 
-from flask import url_for
-
 from ..models import ChartTask, CodeTemplate
 
 REQUIRED_TEMPLATE_PLACEHOLDERS = {"{title}", "{summary}", "{table_data}", "{data_points}"}
@@ -26,21 +24,12 @@ def render_template_for_task(template: CodeTemplate, task: ChartTask) -> str:
     if not result.is_success:
         raise ValueError("任务生成失败，无法渲染模板。")
 
-    try:
-        image_url = (
-            url_for("charts.serve_upload", filename=task.image_path, _external=True)
-            if task.image_path
-            else ""
-        )
-    except RuntimeError:  # pragma: no cover - fallback when outside request context
-        image_url = ""
-
     context = _SafeTemplateContext(
-        title=task.title,
+        title=task.name,
         summary=(result.summary or "") if result else "",
         table_data=json.dumps(result.table_data or []),
         data_points=json.dumps(result.data_points or []),
-        image_url=image_url,
+        image_url="",
     )
     try:
         return template.content.format_map(context)

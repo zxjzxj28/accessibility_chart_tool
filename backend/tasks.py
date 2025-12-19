@@ -2,13 +2,12 @@ from __future__ import annotations
 import queue
 import threading
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
 from flask import Flask
 
 from .extensions import db
-from .models import ChartTask, ChartTaskResult
+from .models import ChartTask, ChartTaskResult, TaskStatus
 from .utils.chart_processing import process_chart
 
 
@@ -42,11 +41,10 @@ class ChartProcessingWorker:
                     task = ChartTask.query.get(payload.task_id)
                     if not task:
                         continue
-                    if task.status == "cancelled":
+                    if task.status == TaskStatus.CANCELLED:
                         continue
 
-                    task.status = "processing"
-                    task.ended_at = None
+                    task.status = TaskStatus.PROCESSING
                     db.session.commit()
 
                     result_payload = process_chart(
@@ -63,13 +61,12 @@ class ChartProcessingWorker:
                     task_result.table_data = result_payload.get("table_data")
                     task_result.error_message = None
 
-                    task.status = "completed"
-                    task.ended_at = datetime.utcnow()
+                    task.status = TaskStatus.COMPLETED
                     db.session.commit()
                 except Exception as exc:  # pragma: no cover - defensive logging
                     task = ChartTask.query.get(payload.task_id)
                     if task:
-                        task.status = "failed"
+                        task.status = TaskStatus.FAILED
                         task_result = task.result or ChartTaskResult(task=task)
                         if task.result is None:
                             db.session.add(task_result)
@@ -78,7 +75,6 @@ class ChartProcessingWorker:
                         task_result.summary = None
                         task_result.data_points = None
                         task_result.table_data = None
-                        task.ended_at = datetime.utcnow()
                         db.session.commit()
                 finally:
                     self._queue.task_done()
