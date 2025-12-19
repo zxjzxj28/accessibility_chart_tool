@@ -2,7 +2,7 @@
   <div class="task-detail" v-if="task">
     <header class="header">
       <div>
-        <h1>{{ task.title }}</h1>
+        <h1>{{ task.name }}</h1>
         <p class="muted">状态：{{ statusLabel(task.status) }} · 创建于 {{ formatDate(task.created_at) }}</p>
       </div>
       <router-link class="ghost" to="/">返回列表</router-link>
@@ -10,8 +10,8 @@
 
     <section class="card">
       <h2>任务结果</h2>
-      <p v-if="task.status === 'queued' || task.status === 'processing'" class="muted">任务正在处理中，请稍后刷新。</p>
-      <p v-else-if="task.status === 'failed'" class="error">{{ task.result?.error_message || '处理失败' }}</p>
+      <p v-if="[0, 1].includes(Number(task.status))" class="muted">任务正在处理中，请稍后刷新。</p>
+      <p v-else-if="Number(task.status) === 3" class="error">{{ task.result?.error_message || '处理失败' }}</p>
       <template v-else>
         <article class="summary" v-if="task.summary">
           <h3>图表摘要</h3>
@@ -79,20 +79,14 @@ const selectedTemplateId = ref('');
 const renderedTemplate = ref('');
 
 const statusLabel = (status) => {
-  switch (status) {
-    case 'queued':
-      return '排队中';
-    case 'processing':
-      return '处理中';
-    case 'completed':
-      return '已完成';
-    case 'failed':
-      return '失败';
-    case 'cancelled':
-      return '已取消';
-    default:
-      return status;
-  }
+  const mapping = {
+    0: '排队中',
+    1: '处理中',
+    2: '已完成',
+    3: '失败',
+    4: '已取消'
+  };
+  return mapping[status] || '未知';
 };
 
 const formatDate = (value) => new Date(value).toLocaleString();
@@ -149,7 +143,7 @@ onMounted(async () => {
 }
 
 .muted {
-  color: #6b7280;
+  color: #5b6472;
 }
 
 .error {
@@ -158,9 +152,10 @@ onMounted(async () => {
 
 .card {
   background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -209,25 +204,28 @@ onMounted(async () => {
 
 .template-controls select {
   flex: 1;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 8px 12px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfcff;
 }
 
 .primary {
-  background: #2563eb;
+  background: linear-gradient(90deg, #1f3c88, #274690);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 10px;
+  padding: 9px 16px;
   cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 12px 26px rgba(31, 60, 136, 0.18);
 }
 
 .ghost {
-  background: none;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  padding: 7px 12px;
   cursor: pointer;
 }
 

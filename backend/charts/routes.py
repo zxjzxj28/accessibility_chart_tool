@@ -18,12 +18,18 @@ from flask import (
     url_for,
 )
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from ..extensions import db
-from ..models import ChartApplication, ChartTask, ChartTaskResult, CodeTemplate
+from ..models import (
+    ChartTask,
+    ChartTaskResult,
+    CodeTemplate,
+    TaskStatus,
+    TaskType,
+)
 from ..tasks import TaskPayload, worker
 from ..utils.template_engine import (
     REQUIRED_TEMPLATE_PLACEHOLDERS,
@@ -39,12 +45,6 @@ def _current_user_id() -> int:
         return int(identity)
     except (TypeError, ValueError):  # pragma: no cover - defensive
         abort(401, description="Invalid authentication token.")
-
-
-def _application_payload(app: ChartApplication) -> dict[str, Any]:
-    payload = app.to_dict()
-    payload["task_count"] = sum(1 for task in app.tasks if not task.is_deleted)
-    return payload
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -68,157 +68,14 @@ def serve_upload(filename: str):
     return send_from_directory(upload_folder, filename)
 
 
-@bp.get("/applications")
-@jwt_required()
-def list_applications():
-    user_id = _current_user_id()
-    apps = (
-        ChartApplication.query.filter_by(user_id=user_id, is_deleted=False)
-        .options(joinedload(ChartApplication.tasks))
-        .order_by(ChartApplication.created_at.asc())
-        .all()
-    )
-    return jsonify([_application_payload(app) for app in apps])
-
-
-@bp.post("/applications")
-@jwt_required()
-def create_application():
-    user_id = _current_user_id()
-    payload = request.get_json() or {}
-    name = (payload.get("name") or "").strip()
-
-    if not name:
-        return jsonify({"message": "应用名称不能为空"}), 400
-
-    existing = (
-        ChartApplication.query.filter(
-            ChartApplication.user_id == user_id,
-            func.lower(ChartApplication.name) == name.lower(),
-        )
-        .order_by(ChartApplication.created_at.asc())
-        .first()
-    )
-    if existing:
-        if existing.is_deleted:
-            existing.is_deleted = False
-            db.session.commit()
-            return jsonify(_application_payload(existing)), 200
-        return jsonify({"message": "同名应用已存在"}), 400
-
-    application = ChartApplication(name=name, user_id=user_id)
-    db.session.add(application)
-    db.session.commit()
-    return jsonify(_application_payload(application)), 201
-
-
-@bp.patch("/applications/<int:app_id>")
-@jwt_required()
-def update_application(app_id: int):
-    user_id = _current_user_id()
-    application = ChartApplication.query.get_or_404(app_id)
-    if application.user_id != user_id or application.is_deleted:
-        return jsonify({"message": "未找到应用"}), 404
-
-    payload = request.get_json() or {}
-    name = payload.get("name")
-
-    if name is not None:
-        name = name.strip()
-        if not name:
-            return jsonify({"message": "应用名称不能为空"}), 400
-        conflict = (
-            ChartApplication.query.filter(
-                ChartApplication.user_id == user_id,
-                func.lower(ChartApplication.name) == name.lower(),
-                ChartApplication.id != application.id,
-                ChartApplication.is_deleted == False,  # noqa: E712
-            )
-            .order_by(ChartApplication.created_at.asc())
-            .first()
-        )
-        if conflict:
-            return jsonify({"message": "同名应用已存在"}), 400
-        application.name = name
-
-    db.session.commit()
-    return jsonify(_application_payload(application))
-
-
-@bp.delete("/applications/<int:app_id>")
-@jwt_required()
-def delete_application(app_id: int):
-    user_id = _current_user_id()
-    application = ChartApplication.query.get_or_404(app_id)
-    if application.user_id != user_id or application.is_deleted:
-        return jsonify({"message": "未找到应用"}), 404
-
-    for task in list(application.tasks):
-        if task.status in {"queued", "processing"}:
-            task.status = "cancelled"
-        if task.ended_at is None:
-            task.ended_at = datetime.utcnow()
-    db.session.delete(application)
-    db.session.commit()
-    return jsonify({"message": "应用已删除"})
-
-
-def _ensure_default_application(user_id: int) -> ChartApplication:
-    default_app = (
-        ChartApplication.query.filter_by(
-            user_id=user_id, name="默认应用"
-        )
-        .order_by(ChartApplication.created_at.asc())
-        .first()
-    )
-    if default_app:
-        if default_app.is_deleted:
-            default_app.is_deleted = False
-            db.session.commit()
-        return default_app
-
-    default_app = ChartApplication(name="默认应用", user_id=user_id)
-    db.session.add(default_app)
-    db.session.commit()
-    return default_app
-
-
-def _resolve_application(user_id: int, name: str | None, app_id: str | None) -> ChartApplication:
-    if app_id:
-        try:
-            app_int = int(app_id)
-        except (TypeError, ValueError):
-            raise ValueError("应用不存在") from None
-        application = ChartApplication.query.filter_by(
-            id=app_int, user_id=user_id
-        ).first()
-        if not application:
-            raise ValueError("应用不存在")
-        if application.is_deleted:
-            application.is_deleted = False
-            db.session.commit()
-        return application
-
-    if name:
-        match = (
-            ChartApplication.query.filter(
-                ChartApplication.user_id == user_id,
-                func.lower(ChartApplication.name) == name.lower(),
-            )
-            .order_by(ChartApplication.created_at.asc())
-            .first()
-        )
-        if match:
-            if match.is_deleted:
-                match.is_deleted = False
-                db.session.commit()
-            return match
-        application = ChartApplication(name=name, user_id=user_id)
-        db.session.add(application)
-        db.session.commit()
-        return application
-
-    return _ensure_default_application(user_id)
+def _save_upload(file_storage) -> str:
+    upload_folder = Path(current_app.config["UPLOAD_FOLDER"])
+    upload_folder.mkdir(parents=True, exist_ok=True)
+    filename = secure_filename(file_storage.filename or "chart.png")
+    ext = Path(filename).suffix or ".png"
+    target = upload_folder / f"{uuid.uuid4().hex}{ext}"
+    file_storage.save(target)
+    return target.name
 
 
 def _resolve_template(user_id: int, template_id: str | None) -> CodeTemplate | None:
@@ -234,34 +91,22 @@ def _resolve_template(user_id: int, template_id: str | None) -> CodeTemplate | N
     return template
 
 
-def _save_upload(file_storage) -> str:
-    upload_folder = Path(current_app.config["UPLOAD_FOLDER"])
-    upload_folder.mkdir(parents=True, exist_ok=True)
-    filename = secure_filename(file_storage.filename or "chart.png")
-    ext = Path(filename).suffix or ".png"
-    target = upload_folder / f"{uuid.uuid4().hex}{ext}"
-    file_storage.save(target)
-    return target.name
-
-
 @bp.get("/tasks")
 @jwt_required()
 def list_tasks():
     user_id = _current_user_id()
     keyword = (request.args.get("keyword") or "").strip()
-    app_id = request.args.get("app_id")
     task_name = (request.args.get("task_name") or "").strip()
-    status = (request.args.get("status") or "").strip()
+    status_raw = request.args.get("status")
     created_from = _parse_datetime(request.args.get("created_from"))
     created_to = _parse_datetime(request.args.get("created_to"))
-    ended_from = _parse_datetime(request.args.get("ended_from"))
-    ended_to = _parse_datetime(request.args.get("ended_to"))
+    updated_from = _parse_datetime(request.args.get("updated_from"))
+    updated_to = _parse_datetime(request.args.get("updated_to"))
     page = int(request.args.get("page", 1))
     per_page = min(int(request.args.get("per_page", 12)), 50)
 
     query = (
         ChartTask.query.options(
-            joinedload(ChartTask.application),
             joinedload(ChartTask.template),
             joinedload(ChartTask.result),
         )
@@ -269,24 +114,26 @@ def list_tasks():
         .order_by(ChartTask.created_at.desc())
     )
 
-    if app_id:
-        query = query.filter(ChartTask.app_id == int(app_id))
-    if status:
-        query = query.filter(ChartTask.status == status)
+    if status_raw not in {None, ""}:
+        try:
+            status_value = int(status_raw)
+        except (TypeError, ValueError):
+            return jsonify({"message": "无效的状态筛选"}), 400
+        query = query.filter(ChartTask.status == status_value)
     if task_name:
-        query = query.filter(ChartTask.title.ilike(f"%{task_name}%"))
+        query = query.filter(ChartTask.name.ilike(f"%{task_name}%"))
     if created_from:
         query = query.filter(ChartTask.created_at >= created_from)
     if created_to:
         query = query.filter(ChartTask.created_at <= created_to)
-    if ended_from:
-        query = query.filter(ChartTask.ended_at.isnot(None), ChartTask.ended_at >= ended_from)
-    if ended_to:
-        query = query.filter(ChartTask.ended_at.isnot(None), ChartTask.ended_at <= ended_to)
+    if updated_from:
+        query = query.filter(ChartTask.updated_at >= updated_from)
+    if updated_to:
+        query = query.filter(ChartTask.updated_at <= updated_to)
     if keyword:
         like = f"%{keyword}%"
         query = query.outerjoin(ChartTaskResult).filter(
-            or_(ChartTask.title.ilike(like), ChartTaskResult.summary.ilike(like))
+            or_(ChartTask.name.ilike(like), ChartTaskResult.summary.ilike(like))
         )
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -302,7 +149,6 @@ def list_tasks():
     )
 
 
-
 @bp.post("/tasks")
 @jwt_required()
 def create_task():
@@ -311,32 +157,27 @@ def create_task():
     creation_mode = payload.get("mode")
 
     if creation_mode == "metadata":
-        title = (payload.get("title") or "").strip()
-        if not title:
-            return jsonify({"message": "任务标题不能为空"}), 400
+        name = (payload.get("name") or payload.get("title") or "").strip()
+        if not name:
+            return jsonify({"message": "任务名称不能为空"}), 400
 
         summary = (payload.get("summary") or "").strip()
         if not summary:
             return jsonify({"message": "请填写摘要内容"}), 400
 
-        application_name = (payload.get("application_name") or "").strip()
-        application_id = payload.get("application_id")
         template_id = payload.get("template_id")
 
         try:
-            application = _resolve_application(user_id, application_name, application_id)
             template = _resolve_template(user_id, template_id)
         except ValueError as exc:
             return jsonify({"message": str(exc)}), 400
 
         task = ChartTask(
-            title=title,
-            status="completed",
+            name=name,
+            type=TaskType.METADATA.value,
+            status=TaskStatus.COMPLETED.value,
             user_id=user_id,
-            application=application,
-            image_path=None,
             template=template,
-            ended_at=datetime.utcnow(),
         )
         db.session.add(task)
         db.session.flush()
@@ -360,16 +201,13 @@ def create_task():
     if file_storage.filename == "":
         return jsonify({"message": "请选择有效的图片文件"}), 400
 
-    title = (request.form.get("title") or "").strip()
-    if not title:
-        return jsonify({"message": "任务标题不能为空"}), 400
+    name = (request.form.get("name") or request.form.get("title") or "").strip()
+    if not name:
+        return jsonify({"message": "任务名称不能为空"}), 400
 
-    application_name = (request.form.get("application_name") or "").strip()
-    application_id = request.form.get("application_id")
     template_id = request.form.get("template_id")
 
     try:
-        application = _resolve_application(user_id, application_name, application_id)
         template = _resolve_template(user_id, template_id)
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
@@ -378,17 +216,22 @@ def create_task():
     public_url = url_for("charts.serve_upload", filename=filename, _external=True)
 
     task = ChartTask(
-        title=title,
-        status="queued",
+        name=name,
+        type=TaskType.UPLOAD.value,
+        status=TaskStatus.QUEUED.value,
         user_id=user_id,
-        application=application,
-        image_path=filename,
         template=template,
     )
     db.session.add(task)
     db.session.commit()
 
-    worker.enqueue(TaskPayload(task_id=task.id, image_path=str(Path(current_app.config["UPLOAD_FOLDER"]) / filename), public_image_url=public_url))
+    worker.enqueue(
+        TaskPayload(
+            task_id=task.id,
+            image_path=str(Path(current_app.config["UPLOAD_FOLDER"]) / filename),
+            public_image_url=public_url,
+        )
+    )
 
     return jsonify(task.to_dict()), 201
 
@@ -396,7 +239,6 @@ def create_task():
 def _load_task(task_id: int, user_id: int) -> ChartTask:
     task = (
         ChartTask.query.options(
-            joinedload(ChartTask.application),
             joinedload(ChartTask.template),
             joinedload(ChartTask.result),
         )
@@ -423,22 +265,16 @@ def update_task(task_id: int):
     task = _load_task(task_id, user_id)
     payload = request.get_json() or {}
 
-    title = payload.get("title")
-    if title is not None:
-        title = title.strip()
-        if not title:
-            return jsonify({"message": "任务标题不能为空"}), 400
-        task.title = title
+    name = payload.get("name") or payload.get("title")
+    if name is not None:
+        name = str(name).strip()
+        if not name:
+            return jsonify({"message": "任务名称不能为空"}), 400
+        task.name = name
 
-    app_id = payload.get("app_id")
     template_id = payload.get("template_id")
 
     try:
-        application = task.application
-        if app_id:
-            application = _resolve_application(user_id, None, app_id)
-            task.application = application
-            task.app_id = application.id
         if template_id is not None:
             task.template = _resolve_template(user_id, template_id)
     except ValueError as exc:
@@ -453,10 +289,9 @@ def update_task(task_id: int):
 def cancel_task(task_id: int):
     user_id = _current_user_id()
     task = _load_task(task_id, user_id)
-    if task.status not in {"queued", "processing"}:
+    if task.status not in {TaskStatus.QUEUED, TaskStatus.PROCESSING}:
         return jsonify({"message": "当前状态无法取消"}), 400
-    task.status = "cancelled"
-    task.ended_at = datetime.utcnow()
+    task.status = TaskStatus.CANCELLED
     db.session.commit()
     return jsonify({"message": "任务已取消"})
 
@@ -467,8 +302,6 @@ def delete_task(task_id: int):
     user_id = _current_user_id()
     task = _load_task(task_id, user_id)
     task.is_deleted = True
-    if task.ended_at is None:
-        task.ended_at = datetime.utcnow()
     db.session.commit()
     return jsonify({"message": "任务已删除"})
 
@@ -544,13 +377,14 @@ def create_template():
     user_id = _current_user_id()
     payload = request.get_json() or {}
     name = (payload.get("name") or "").strip()
-    language = (payload.get("language") or "").strip().lower()
+    language = (payload.get("language") or "").strip()
     content = payload.get("content") or ""
+    template_type = payload.get("type", 0)
 
     if not name:
         return jsonify({"message": "模板名称不能为空"}), 400
-    if language not in {"java", "kotlin"}:
-        return jsonify({"message": "仅支持 Java 或 Kotlin 模板"}), 400
+    if not language:
+        return jsonify({"message": "模板语言不能为空"}), 400
 
     missing = validate_template_content(content)
     if missing:
@@ -559,11 +393,18 @@ def create_template():
             400,
         )
 
+    parsed_type: int
+    try:
+        parsed_type = int(template_type)
+    except (TypeError, ValueError):
+        parsed_type = 0
+
     template = CodeTemplate(
         name=name,
         language=language,
         content=content,
         user_id=user_id,
+        type=parsed_type,
     )
     db.session.add(template)
     db.session.commit()
@@ -585,6 +426,7 @@ def update_template(template_id: int):
     name = payload.get("name")
     language = payload.get("language")
     content = payload.get("content")
+    template_type = payload.get("type")
 
     if name is not None:
         name = name.strip()
@@ -593,10 +435,16 @@ def update_template(template_id: int):
         template.name = name
 
     if language is not None:
-        language = language.strip().lower()
-        if language not in {"java", "kotlin"}:
-            return jsonify({"message": "仅支持 Java 或 Kotlin 模板"}), 400
+        language = language.strip()
+        if not language:
+            return jsonify({"message": "模板语言不能为空"}), 400
         template.language = language
+
+    if template_type is not None:
+        try:
+            template.type = int(template_type)
+        except (TypeError, ValueError):
+            return jsonify({"message": "模板类型必须为数字"}), 400
 
     if content is not None:
         missing = validate_template_content(content)
@@ -633,3 +481,4 @@ def validate_template():
     content = payload.get("content") or ""
     missing = validate_template_content(content)
     return jsonify({"missing": missing, "required": sorted(REQUIRED_TEMPLATE_PLACEHOLDERS)})
+
