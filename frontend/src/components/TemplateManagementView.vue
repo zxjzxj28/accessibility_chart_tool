@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <h1>模板管理</h1>
-        <p class="muted">维护 Java / Kotlin 代码模板，保存前会自动检查必需占位符。</p>
+        <p class="muted">维护通用代码模板，保存前会自动检查必需占位符。</p>
       </div>
       <router-link class="ghost" to="/">返回首页</router-link>
     </header>
@@ -21,7 +21,7 @@
           :class="{ system: tpl.is_system }"
         >
           <h3>{{ tpl.name }}</h3>
-          <p class="muted">语言：{{ tpl.language.toUpperCase() }} · {{ tpl.is_system ? '系统模板' : '自定义模板' }}</p>
+          <p class="muted">语言：{{ tpl.language }} · 类型：{{ tpl.type }} · {{ tpl.is_system ? '系统模板' : '自定义模板' }}</p>
           <footer>
             <button class="link" @click="editTemplate(tpl)">编辑</button>
             <button class="link" :disabled="tpl.is_system" @click="duplicateTemplate(tpl)">复制</button>
@@ -47,10 +47,11 @@
         </label>
         <label>
           语言
-          <select v-model="editor.language" :disabled="editor.is_system">
-            <option value="java">Java</option>
-            <option value="kotlin">Kotlin</option>
-          </select>
+          <input v-model="editor.language" type="text" required :disabled="editor.is_system" />
+        </label>
+        <label>
+          类型（数字）
+          <input v-model.number="editor.type" type="number" min="0" :disabled="editor.is_system" />
         </label>
         <label>
           模板内容
@@ -76,6 +77,7 @@ const editor = reactive({
   id: '',
   name: '',
   language: 'java',
+  type: 0,
   content: '',
   is_system: false,
   message: '',
@@ -94,6 +96,7 @@ const startNewTemplate = () => {
   editor.id = '';
   editor.name = '';
   editor.language = 'java';
+  editor.type = 0;
   editor.content = '';
   editor.is_system = false;
   editor.message = `请包含占位符：${REQUIRED_PLACEHOLDERS.join('、')}`;
@@ -105,6 +108,7 @@ const editTemplate = (tpl) => {
   editor.id = String(tpl.id);
   editor.name = tpl.name;
   editor.language = tpl.language;
+  editor.type = tpl.type ?? 0;
   editor.content = tpl.content;
   editor.is_system = tpl.is_system;
   editor.message = '';
@@ -116,6 +120,7 @@ const duplicateTemplate = (tpl) => {
   editor.id = '';
   editor.name = `${tpl.name} 副本`;
   editor.language = tpl.language;
+  editor.type = tpl.type ?? 0;
   editor.content = tpl.content;
   editor.is_system = false;
   editor.message = '';
@@ -155,12 +160,14 @@ const saveTemplate = async () => {
       await axios.patch(`/api/templates/${editor.id}`, {
         name: editor.name,
         language: editor.language,
+        type: editor.type,
         content: editor.content
       });
     } else {
       await axios.post('/api/templates', {
         name: editor.name,
         language: editor.language,
+        type: editor.type,
         content: editor.content
       });
     }
@@ -195,14 +202,15 @@ fetchTemplates().catch(() => {
 }
 
 .muted {
-  color: #6b7280;
+  color: #5b6472;
 }
 
 .card {
   background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -222,7 +230,7 @@ fetchTemplates().catch(() => {
 
 .template-item {
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -254,10 +262,11 @@ fetchTemplates().catch(() => {
 input,
 select,
 textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 0.95rem;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.96rem;
+  background: #fbfcff;
 }
 
 textarea {
@@ -265,26 +274,28 @@ textarea {
 }
 
 .primary {
-  background: #2563eb;
+  background: linear-gradient(90deg, #1f3c88, #274690);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 10px;
+  padding: 9px 16px;
   cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 12px 26px rgba(31, 60, 136, 0.18);
 }
 
 .ghost {
-  background: none;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  padding: 7px 12px;
   cursor: pointer;
 }
 
 .link {
   background: none;
   border: none;
-  color: #2563eb;
+  color: #1f3c88;
   cursor: pointer;
   padding: 0;
 }
