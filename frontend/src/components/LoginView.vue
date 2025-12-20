@@ -4,15 +4,7 @@
       <h1>无障碍图表工具</h1>
       <p class="subtitle">登录以管理你的无障碍图表转换任务。</p>
       <form @submit.prevent="handleSubmit" class="form">
-        <div class="toggle-group">
-          <button type="button" :class="{ active: mode === 'email' }" @click="mode = 'email'">邮箱登录</button>
-          <button type="button" :class="{ active: mode === 'account' }" @click="mode = 'account'">账号登录</button>
-        </div>
-        <label v-if="mode === 'email'">
-          邮箱
-          <input v-model="identifier" type="email" required placeholder="请输入邮箱地址" />
-        </label>
-        <label v-else>
+        <label>
           账号
           <input v-model="identifier" type="text" required placeholder="请输入账号名称" />
         </label>
@@ -47,14 +39,12 @@ const identifier = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
-const mode = ref('email');
 
 const handleSubmit = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const value = mode.value === 'email' ? identifier.value.trim().toLowerCase() : identifier.value.trim();
-    await auth.login({ identifier: value, password: password.value });
+    await auth.login({ identifier: identifier.value.trim(), password: password.value });
     const redirect = route.query.redirect || '/';
     router.push(redirect);
   } catch (err) {
@@ -104,38 +94,6 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md, 16px);
-}
-
-.toggle-group {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-sm, 8px);
-  padding: 4px;
-  background: var(--color-bg, #fafbfc);
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border, #e1e4e8);
-}
-
-.toggle-group button {
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-sm, 6px);
-  padding: 10px 16px;
-  font-size: var(--text-sm, 13px);
-  font-weight: 500;
-  color: var(--color-text-secondary, #57606a);
-  transition: all 0.15s ease;
-}
-
-.toggle-group button.active {
-  background: var(--color-surface, #ffffff);
-  color: var(--color-primary, #2563eb);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
-  font-weight: 600;
-}
-
-.toggle-group button:not(.active):hover {
-  color: var(--color-text-primary, #24292f);
 }
 
 label {
