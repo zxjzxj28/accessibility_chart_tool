@@ -1,7 +1,18 @@
 <template>
   <div class="auth-layout">
     <div class="panel">
-      <h1>无障碍图表组件开发工具</h1>
+      <div class="header">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18"/>
+            <path d="M18 17V9"/>
+            <path d="M13 17V5"/>
+            <path d="M8 17v-3"/>
+          </svg>
+        </div>
+        <h1>无障碍图表组件开发工具</h1>
+        <p class="subtitle">登录以继续使用</p>
+      </div>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
           账号
@@ -60,34 +71,58 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg, #fafbfc);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: var(--spacing-lg, 24px);
 }
 
 .panel {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   background: var(--color-surface, #ffffff);
-  border-radius: var(--radius-lg, 12px);
-  padding: var(--spacing-xl, 32px);
-  border: 1px solid var(--color-border, #e1e4e8);
-  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-lg, 16px);
+  padding: 40px 36px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.logo-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+}
+
+.logo-icon svg {
+  width: 32px;
+  height: 32px;
+  color: #ffffff;
 }
 
 h1 {
   margin: 0;
-  font-size: 32px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
   color: var(--color-text-primary, #24292f);
   letter-spacing: -0.02em;
   text-align: center;
+  line-height: 1.3;
 }
 
 .subtitle {
-  margin: var(--spacing-sm, 8px) 0 var(--spacing-lg, 24px);
+  margin: 12px 0 0;
   color: var(--color-text-secondary, #57606a);
-  font-size: var(--text-md, 15px);
-  line-height: var(--leading-relaxed, 1.75);
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .form {
@@ -121,29 +156,37 @@ input::placeholder {
 
 input:focus {
   outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px var(--color-primary-light, #eff6ff);
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
 }
 
 .form > button[type="submit"] {
-  margin-top: var(--spacing-sm, 8px);
-  background: var(--color-primary, #2563eb);
+  margin-top: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
   padding: 14px 24px;
   border: none;
   border-radius: var(--radius-md, 8px);
   font-size: 18px;
   font-weight: 600;
-  transition: background-color 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35);
+  cursor: pointer;
 }
 
 .form > button[type="submit"]:hover:not(:disabled) {
-  background: var(--color-primary-hover, #1d4ed8);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+}
+
+.form > button[type="submit"]:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .form > button[type="submit"]:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
 }
 
 .hint {
@@ -154,11 +197,13 @@ input:focus {
 }
 
 .hint a {
-  color: var(--color-primary, #2563eb);
+  color: #667eea;
   font-weight: 600;
+  transition: color 0.15s ease;
 }
 
 .hint a:hover {
+  color: #764ba2;
   text-decoration: underline;
 }
 
