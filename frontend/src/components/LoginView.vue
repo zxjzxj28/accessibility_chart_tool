@@ -76,7 +76,7 @@ const handleSubmit = async () => {
 
 h1 {
   margin: 0;
-  font-size: var(--text-3xl, 24px);
+  font-size: 32px;
   font-weight: 600;
   color: var(--color-text-primary, #24292f);
   letter-spacing: -0.02em;
@@ -101,15 +101,15 @@ label {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm, 8px);
-  font-size: var(--text-sm, 13px);
+  font-size: 16px;
 }
 
 input {
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--color-border, #e1e4e8);
   background: var(--color-surface, #ffffff);
-  font-size: var(--text-md, 15px);
+  font-size: 18px;
   color: var(--color-text-primary, #24292f);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -128,10 +128,10 @@ input:focus {
   margin-top: var(--spacing-sm, 8px);
   background: var(--color-primary, #2563eb);
   color: #ffffff;
-  padding: 12px 20px;
+  padding: 14px 24px;
   border: none;
   border-radius: var(--radius-md, 8px);
-  font-size: var(--text-md, 15px);
+  font-size: 18px;
   font-weight: 600;
   transition: background-color 0.15s ease;
 }
@@ -149,7 +149,7 @@ input:focus {
   margin-top: var(--spacing-lg, 24px);
   color: var(--color-text-secondary, #57606a);
   text-align: center;
-  font-size: var(--text-sm, 13px);
+  font-size: 15px;
 }
 
 .hint a {
@@ -167,7 +167,7 @@ input:focus {
   background: var(--color-error-bg, #fef2f2);
   color: var(--color-error, #dc2626);
   text-align: center;
-  font-size: var(--text-sm, 13px);
+  font-size: 15px;
   border-radius: var(--radius-sm, 6px);
   border: 1px solid rgba(220, 38, 38, 0.2);
 }
