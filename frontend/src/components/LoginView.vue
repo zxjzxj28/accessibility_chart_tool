@@ -80,6 +80,7 @@ h1 {
   font-weight: 600;
   color: var(--color-text-primary, #24292f);
   letter-spacing: -0.02em;
+  text-align: center;
 }
 
 .subtitle {
