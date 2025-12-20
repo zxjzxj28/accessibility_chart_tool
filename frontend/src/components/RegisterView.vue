@@ -2,7 +2,6 @@
   <div class="auth-layout">
     <div class="panel">
       <h1>创建你的账号</h1>
-      <p class="subtitle">加入平台，生成可复用的无障碍图表组件。</p>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
           账号
@@ -103,6 +102,7 @@ h1 {
   font-weight: 600;
   color: var(--color-text-primary, #24292f);
   letter-spacing: -0.02em;
+  text-align: center;
 }
 
 .subtitle {
