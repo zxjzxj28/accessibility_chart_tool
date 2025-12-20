@@ -1,8 +1,7 @@
 <template>
   <div class="auth-layout">
     <div class="panel">
-      <h1>无障碍图表工具</h1>
-      <p class="subtitle">登录以管理你的无障碍图表转换任务。</p>
+      <h1>无障碍图表组件开发工具</h1>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
           账号
