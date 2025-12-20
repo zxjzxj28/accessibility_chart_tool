@@ -412,77 +412,143 @@ public class ChartActivity extends AppCompatActivity {
 
 <style scoped>
 .doc-page {
-  max-width: 960px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 32px 16px 80px;
+  padding: var(--spacing-xl, 32px) var(--spacing-md, 16px) var(--spacing-2xl, 48px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--spacing-lg, 24px);
 }
 
 .doc-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--spacing-md, 16px);
+  flex-wrap: wrap;
+}
+
+.doc-header h1 {
+  margin: 0;
+  font-size: var(--text-3xl, 24px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+  letter-spacing: -0.02em;
 }
 
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 600;
-  font-size: 12px;
-  color: #7b7b7b;
-  margin: 0 0 6px;
+  font-size: var(--text-xs, 12px);
+  color: var(--color-primary, #2563eb);
+  margin: 0 0 var(--spacing-sm, 8px);
+}
+
+.muted {
+  color: var(--color-text-secondary, #57606a);
+  font-size: var(--text-sm, 13px);
+  margin-top: var(--spacing-xs, 4px);
+  line-height: var(--leading-relaxed, 1.75);
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e6e6e6;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e1e4e8);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-lg, 24px);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
 }
 
 .card h2 {
-  margin-bottom: 10px;
+  margin: 0 0 var(--spacing-md, 16px);
+  font-size: var(--text-xl, 18px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+}
+
+.card h3 {
+  margin: var(--spacing-md, 16px) 0 var(--spacing-sm, 8px);
+  font-size: var(--text-md, 15px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+}
+
+.card h3:first-child {
+  margin-top: 0;
+}
+
+.card p {
+  margin: 0 0 var(--spacing-md, 16px);
+  font-size: var(--text-sm, 13px);
+  color: var(--color-text-secondary, #57606a);
+  line-height: var(--leading-relaxed, 1.75);
+}
+
+.card p code {
+  background: var(--color-bg, #fafbfc);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 6px);
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  font-size: var(--text-xs, 12px);
+  color: var(--color-primary, #2563eb);
+  border: 1px solid var(--color-border-light, #eaecef);
 }
 
 .code-block {
-  background: #0f172a;
+  background: #1e293b;
   color: #e2e8f0;
-  border-radius: 10px;
-  padding: 14px;
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-md, 16px);
   overflow-x: auto;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  line-height: 1.5;
-  font-size: 13px;
-  border: 1px solid #1e293b;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  line-height: var(--leading-relaxed, 1.75);
+  font-size: var(--text-sm, 13px);
+  border: 1px solid #334155;
 }
 
 .code-block code {
   white-space: pre;
+  color: inherit;
+  background: none;
+  padding: 0;
+  border: none;
+  font-size: inherit;
 }
 
 .example {
-  display: grid;
-  gap: 14px;
-}
-
-.muted {
-  color: #6b7280;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
 }
 
 .ghost {
-  border: 1px solid #d1d5db;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #fff;
-  color: #374151;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e1e4e8);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 14px;
+  color: var(--color-text-primary, #24292f);
+  font-weight: 500;
+  font-size: var(--text-sm, 13px);
   text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
 }
 
 .ghost:hover {
-  background: #f3f4f6;
+  background: var(--color-bg, #fafbfc);
+  border-color: var(--color-text-muted, #8b949e);
+}
+
+@media (max-width: 640px) {
+  .doc-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .code-block {
+    font-size: var(--text-xs, 12px);
+    padding: var(--spacing-sm, 8px);
+  }
 }
 </style>

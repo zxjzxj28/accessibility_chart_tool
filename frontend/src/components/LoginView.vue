@@ -71,113 +71,147 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top, #e0e8ff, #f4f6fb 60%);
+  background: var(--color-bg, #fafbfc);
+  padding: var(--spacing-lg, 24px);
 }
 
 .panel {
-  width: min(420px, 90%);
-  background: white;
-  border-radius: 18px;
-  padding: 36px;
-  box-shadow: 0 25px 45px rgba(15, 23, 42, 0.08);
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface, #ffffff);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-xl, 32px);
+  border: 1px solid var(--color-border, #e1e4e8);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
 }
 
 h1 {
   margin: 0;
-  font-size: 1.8rem;
-  color: #102a43;
+  font-size: var(--text-3xl, 24px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  margin: 8px 0 24px;
-  color: #829ab1;
+  margin: var(--spacing-sm, 8px) 0 var(--spacing-lg, 24px);
+  color: var(--color-text-secondary, #57606a);
+  font-size: var(--text-md, 15px);
+  line-height: var(--leading-relaxed, 1.75);
 }
 
 .form {
-  display: grid;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
 }
 
 .toggle-group {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-sm, 8px);
+  padding: 4px;
+  background: var(--color-bg, #fafbfc);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #e1e4e8);
 }
 
 .toggle-group button {
-  border: 1px solid #d9e2ec;
-  background: #f8fafc;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-weight: 600;
-  color: #486581;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px 16px;
+  font-size: var(--text-sm, 13px);
+  font-weight: 500;
+  color: var(--color-text-secondary, #57606a);
+  transition: all 0.15s ease;
 }
 
 .toggle-group button.active {
-  background: linear-gradient(135deg, #4c6ef5, #2b8aeb);
-  color: white;
-  border-color: #4c6ef5;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-primary, #2563eb);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  font-weight: 600;
+}
+
+.toggle-group button:not(.active):hover {
+  color: var(--color-text-primary, #24292f);
 }
 
 label {
-  font-weight: 600;
-  color: #243b53;
-  display: grid;
-  gap: 6px;
-  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #24292f);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 8px);
+  font-size: var(--text-sm, 13px);
 }
 
 input {
   padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid #d9e2ec;
-  background: #f8fafc;
-  font-size: 1rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #e1e4e8);
+  background: var(--color-surface, #ffffff);
+  font-size: var(--text-md, 15px);
+  color: var(--color-text-primary, #24292f);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input::placeholder {
+  color: var(--color-text-muted, #8b949e);
 }
 
 input:focus {
   outline: none;
-  border-color: #4c6ef5;
-  box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.2);
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 3px var(--color-primary-light, #eff6ff);
 }
 
-button {
-  background: linear-gradient(135deg, #4c6ef5, #2b8aeb);
-  color: white;
-  padding: 12px 16px;
+.form > button[type="submit"] {
+  margin-top: var(--spacing-sm, 8px);
+  background: var(--color-primary, #2563eb);
+  color: #ffffff;
+  padding: 12px 20px;
   border: none;
-  border-radius: 12px;
-  font-size: 1rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-md, 15px);
   font-weight: 600;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 25px rgba(76, 110, 245, 0.3);
+.form > button[type="submit"]:hover:not(:disabled) {
+  background: var(--color-primary-hover, #1d4ed8);
 }
 
-button:disabled {
+.form > button[type="submit"]:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .hint {
-  margin-top: 18px;
-  color: #486581;
+  margin-top: var(--spacing-lg, 24px);
+  color: var(--color-text-secondary, #57606a);
   text-align: center;
+  font-size: var(--text-sm, 13px);
 }
 
 .hint a {
-  color: #4c6ef5;
+  color: var(--color-primary, #2563eb);
   font-weight: 600;
 }
 
+.hint a:hover {
+  text-decoration: underline;
+}
+
 .error {
-  margin-top: 16px;
-  color: #d64545;
+  margin-top: var(--spacing-md, 16px);
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  background: var(--color-error-bg, #fef2f2);
+  color: var(--color-error, #dc2626);
   text-align: center;
+  font-size: var(--text-sm, 13px);
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(220, 38, 38, 0.2);
 }
 </style>

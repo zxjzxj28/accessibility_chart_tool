@@ -128,43 +128,90 @@ onMounted(async () => {
 
 <style scoped>
 .task-detail {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: var(--spacing-xl, 32px) var(--spacing-md, 16px);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--spacing-lg, 24px);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: var(--spacing-md, 16px);
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: var(--text-3xl, 24px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+  letter-spacing: -0.02em;
 }
 
 .muted {
-  color: #5b6472;
+  color: var(--color-text-secondary, #57606a);
+  font-size: var(--text-sm, 13px);
+  margin-top: var(--spacing-xs, 4px);
 }
 
 .error {
-  color: #b91c1c;
+  color: var(--color-error, #dc2626);
+  font-size: var(--text-sm, 13px);
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  background: var(--color-error-bg, #fef2f2);
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(220, 38, 38, 0.2);
 }
 
 .card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 22px;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface, #ffffff);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-lg, 24px);
+  border: 1px solid var(--color-border, #e1e4e8);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  align-items: center;
+  gap: var(--spacing-md, 16px);
+}
+
+.card h2 {
+  margin: 0;
+  font-size: var(--text-xl, 18px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+}
+
+.summary {
+  width: 100%;
+}
+
+.summary h3 {
+  margin: 0 0 var(--spacing-sm, 8px);
+  font-size: var(--text-md, 15px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
 }
 
 .summary p {
   margin: 0;
-  line-height: 1.6;
+  line-height: var(--leading-relaxed, 1.75);
+  color: var(--color-text-secondary, #57606a);
+  font-size: var(--text-md, 15px);
+}
+
+.data-block {
+  width: 100%;
+}
+
+.data-block h3 {
+  margin: 0 0 var(--spacing-sm, 8px);
+  font-size: var(--text-md, 15px);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
 }
 
 .data-block ul {
@@ -173,68 +220,143 @@ onMounted(async () => {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-sm, 8px);
 }
 
 .data-block li {
-  padding: 12px;
-  border-radius: 8px;
-  background: #f9fafb;
-  display: grid;
-  gap: 4px;
+  padding: var(--spacing-md, 16px);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg, #fafbfc);
+  border: 1px solid var(--color-border-light, #eaecef);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 4px);
+  font-size: var(--text-sm, 13px);
+}
+
+.data-block li strong {
+  color: var(--color-text-primary, #24292f);
+  font-weight: 600;
+}
+
+.data-block li span {
+  color: var(--color-text-secondary, #57606a);
 }
 
 .data-block table {
   width: 100%;
   border-collapse: collapse;
+  font-size: var(--text-sm, 13px);
 }
 
 .data-block th,
 .data-block td {
-  border: 1px solid #e5e7eb;
-  padding: 8px;
+  border: 1px solid var(--color-border, #e1e4e8);
+  padding: 10px 12px;
   text-align: left;
+}
+
+.data-block th {
+  background: var(--color-bg, #fafbfc);
+  font-weight: 600;
+  color: var(--color-text-primary, #24292f);
+}
+
+.data-block td {
+  color: var(--color-text-secondary, #57606a);
 }
 
 .template-controls {
   display: flex;
-  gap: 12px;
+  gap: var(--spacing-sm, 8px);
   align-items: center;
+  width: 100%;
 }
 
 .template-controls select {
   flex: 1;
-  border: 1px solid #d6dde8;
-  border-radius: 10px;
+  border: 1px solid var(--color-border, #e1e4e8);
+  border-radius: var(--radius-md, 8px);
   padding: 10px 12px;
-  background: #fbfcff;
+  font-size: var(--text-md, 15px);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-primary, #24292f);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.template-controls select:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 3px var(--color-primary-light, #eff6ff);
 }
 
 .primary {
-  background: linear-gradient(90deg, #1f3c88, #274690);
-  color: #fff;
+  background: var(--color-primary, #2563eb);
+  color: #ffffff;
   border: none;
-  border-radius: 10px;
-  padding: 9px 16px;
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 18px;
   cursor: pointer;
-  font-weight: 700;
-  box-shadow: 0 12px 26px rgba(31, 60, 136, 0.18);
+  font-weight: 600;
+  font-size: var(--text-sm, 13px);
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover, #1d4ed8);
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .ghost {
-  background: #f8fafc;
-  border: 1px solid #d7deea;
-  border-radius: 10px;
-  padding: 7px 12px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e1e4e8);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 14px;
   cursor: pointer;
+  color: var(--color-text-primary, #24292f);
+  font-weight: 500;
+  font-size: var(--text-sm, 13px);
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.ghost:hover {
+  background: var(--color-bg, #fafbfc);
+  border-color: var(--color-text-muted, #8b949e);
 }
 
 .rendered {
-  background: #0f172a;
+  width: 100%;
+  background: #1e293b;
   color: #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-md, 16px);
   white-space: pre-wrap;
-  font-size: 0.9rem;
+  font-size: var(--text-sm, 13px);
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  line-height: var(--leading-relaxed, 1.75);
+  overflow-x: auto;
+  border: 1px solid #334155;
+}
+
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .template-controls {
+    flex-direction: column;
+  }
+
+  .template-controls select,
+  .template-controls .primary {
+    width: 100%;
+  }
 }
 </style>
