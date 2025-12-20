@@ -3,15 +3,29 @@
     <div class="panel">
       <div class="header">
         <div class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 3v18h18"/>
-            <path d="M18 17V9"/>
-            <path d="M13 17V5"/>
-            <path d="M8 17v-3"/>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+            <!-- 图表背景圆形 -->
+            <circle cx="32" cy="32" r="30" fill="url(#logoGradientReg)" />
+            <!-- 坐标轴 -->
+            <path d="M16 48V16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M16 48H48" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- 柱状图 -->
+            <rect x="22" y="34" width="6" height="14" rx="2" fill="white" opacity="0.9"/>
+            <rect x="32" y="24" width="6" height="24" rx="2" fill="white"/>
+            <rect x="42" y="30" width="6" height="18" rx="2" fill="white" opacity="0.9"/>
+            <!-- 无障碍眼睛符号 -->
+            <ellipse cx="32" cy="20" rx="8" ry="5" stroke="white" stroke-width="2" fill="none"/>
+            <circle cx="32" cy="20" r="2.5" fill="white"/>
+            <!-- 渐变定义 -->
+            <defs>
+              <linearGradient id="logoGradientReg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0ea5e9"/>
+                <stop offset="100%" stop-color="#2dd4bf"/>
+              </linearGradient>
+            </defs>
           </svg>
         </div>
         <h1>创建你的账号</h1>
-        <p class="subtitle">注册以开始使用无障碍图表工具</p>
       </div>
       <form @submit.prevent="handleSubmit" class="form">
         <label>
@@ -93,7 +107,7 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
   padding: var(--spacing-lg, 24px);
 }
 
@@ -103,8 +117,8 @@ const handleSubmit = async () => {
   background: var(--color-surface, #ffffff);
   border-radius: var(--radius-lg, 16px);
   padding: 40px 36px;
-  border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .header {
@@ -113,21 +127,17 @@ const handleSubmit = async () => {
 }
 
 .logo-icon {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   margin: 0 auto 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
 }
 
 .logo-icon svg {
-  width: 32px;
-  height: 32px;
-  color: #ffffff;
+  width: 80px;
+  height: 80px;
 }
 
 h1 {
@@ -138,13 +148,6 @@ h1 {
   letter-spacing: -0.02em;
   text-align: center;
   line-height: 1.3;
-}
-
-.subtitle {
-  margin: 12px 0 0;
-  color: var(--color-text-secondary, #57606a);
-  font-size: 15px;
-  line-height: 1.5;
 }
 
 .form {
@@ -178,13 +181,13 @@ input::placeholder {
 
 input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
 }
 
 button[type="submit"] {
   margin-top: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%);
   color: #ffffff;
   padding: 14px 24px;
   border: none;
@@ -192,13 +195,13 @@ button[type="submit"] {
   font-size: 18px;
   font-weight: 600;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
   cursor: pointer;
 }
 
 button[type="submit"]:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
 }
 
 button[type="submit"]:active:not(:disabled) {
@@ -219,13 +222,13 @@ button[type="submit"]:disabled {
 }
 
 .hint a {
-  color: #667eea;
+  color: #0ea5e9;
   font-weight: 600;
   transition: color 0.15s ease;
 }
 
 .hint a:hover {
-  color: #764ba2;
+  color: #0284c7;
   text-decoration: underline;
 }
 
