@@ -158,7 +158,7 @@ public class ChartAccessibleView extends View {
         a11yHelper.invalidateRoot();
     }
 
-    /** 页面展示后，如需默认把焦点放到“摘要” */
+    /** 页面展示后，如需默认把焦点放到"摘要" */
     public void requestInitialAccessibilityFocus() {
         a11yHelper.requestKeyboardFocusForVirtualView(SUMMARY_ID);
         a11yFocusedVirtualId = SUMMARY_ID;
@@ -215,7 +215,7 @@ public class ChartAccessibleView extends View {
             virtualViewIds.add(SUMMARY_ID);
             if (spec == null || spec.points.isEmpty()) return;
 
-            // 按“映射到视图坐标后的 x” 升序
+            // 按"映射到视图坐标后的 x" 升序
             List<DataPoint> pts = new ArrayList<>(spec.points);
             Collections.sort(pts, new Comparator<DataPoint>() {
                 @Override
@@ -277,7 +277,7 @@ public class ChartAccessibleView extends View {
                 invalidate();
                 return true;
             } else if (action == AccessibilityNodeInfoCompat.ACTION_CLICK) {
-                // 需要“点按触发更多信息”可在此扩展
+                // 需要"点按触发更多信息"可在此扩展
                 return true;
             }
             return false;
@@ -412,7 +412,7 @@ public class ChartActivity extends AppCompatActivity {
 
 <style scoped>
 .doc-page {
-  max-width: 800px;
+  max-width: 780px;
   margin: 0 auto;
   padding: var(--spacing-xl, 32px) var(--spacing-md, 16px) var(--spacing-2xl, 48px);
   display: flex;
@@ -430,48 +430,48 @@ public class ChartActivity extends AppCompatActivity {
 
 .doc-header h1 {
   margin: 0;
-  font-size: var(--text-3xl, 24px);
+  font-size: var(--text-2xl, 20px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
-  letter-spacing: -0.02em;
+  color: var(--color-text-primary, #1f2937);
+  letter-spacing: -0.01em;
 }
 
 .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   font-weight: 600;
   font-size: var(--text-xs, 12px);
-  color: var(--color-primary, #2563eb);
+  color: var(--color-text-muted, #6b7280);
   margin: 0 0 var(--spacing-sm, 8px);
 }
 
 .muted {
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
   font-size: var(--text-sm, 13px);
   margin-top: var(--spacing-xs, 4px);
-  line-height: var(--leading-relaxed, 1.75);
+  line-height: var(--leading-relaxed, 1.625);
 }
 
 .card {
   background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-lg, 8px);
   padding: var(--spacing-lg, 24px);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
 }
 
 .card h2 {
   margin: 0 0 var(--spacing-md, 16px);
-  font-size: var(--text-xl, 18px);
+  font-size: var(--text-lg, 16px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .card h3 {
   margin: var(--spacing-md, 16px) 0 var(--spacing-sm, 8px);
-  font-size: var(--text-md, 15px);
+  font-size: var(--text-base, 14px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .card h3:first-child {
@@ -481,28 +481,28 @@ public class ChartActivity extends AppCompatActivity {
 .card p {
   margin: 0 0 var(--spacing-md, 16px);
   font-size: var(--text-sm, 13px);
-  color: var(--color-text-secondary, #57606a);
-  line-height: var(--leading-relaxed, 1.75);
+  color: var(--color-text-secondary, #4b5563);
+  line-height: var(--leading-relaxed, 1.625);
 }
 
 .card p code {
-  background: var(--color-bg, #fafbfc);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm, 6px);
-  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  background: var(--color-bg, #f5f6f7);
+  padding: 2px 5px;
+  border-radius: var(--radius-sm, 4px);
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', 'Consolas', monospace);
   font-size: var(--text-xs, 12px);
-  color: var(--color-primary, #2563eb);
-  border: 1px solid var(--color-border-light, #eaecef);
+  color: var(--color-text-primary, #1f2937);
+  border: 1px solid var(--color-border-light, #e5e7eb);
 }
 
 .code-block {
   background: #1e293b;
   color: #e2e8f0;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md, 6px);
   padding: var(--spacing-md, 16px);
   overflow-x: auto;
-  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
-  line-height: var(--leading-relaxed, 1.75);
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', 'Consolas', monospace);
+  line-height: var(--leading-relaxed, 1.625);
   font-size: var(--text-sm, 13px);
   border: 1px solid #334155;
 }
@@ -524,10 +524,10 @@ public class ChartActivity extends AppCompatActivity {
 
 .ghost {
   background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
-  padding: 8px 14px;
-  color: var(--color-text-primary, #24292f);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: 7px 12px;
+  color: var(--color-text-primary, #1f2937);
   font-weight: 500;
   font-size: var(--text-sm, 13px);
   text-decoration: none;
@@ -536,8 +536,8 @@ public class ChartActivity extends AppCompatActivity {
 }
 
 .ghost:hover {
-  background: var(--color-bg, #fafbfc);
-  border-color: var(--color-text-muted, #8b949e);
+  background: var(--color-bg, #f5f6f7);
+  border-color: var(--color-text-muted, #6b7280);
 }
 
 @media (max-width: 640px) {

@@ -128,7 +128,7 @@ onMounted(async () => {
 
 <style scoped>
 .task-detail {
-  max-width: 800px;
+  max-width: 780px;
   margin: 0 auto;
   padding: var(--spacing-xl, 32px) var(--spacing-md, 16px);
   display: flex;
@@ -146,14 +146,14 @@ onMounted(async () => {
 
 .header h1 {
   margin: 0;
-  font-size: var(--text-3xl, 24px);
+  font-size: var(--text-2xl, 20px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
-  letter-spacing: -0.02em;
+  color: var(--color-text-primary, #1f2937);
+  letter-spacing: -0.01em;
 }
 
 .muted {
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
   font-size: var(--text-sm, 13px);
   margin-top: var(--spacing-xs, 4px);
 }
@@ -161,18 +161,18 @@ onMounted(async () => {
 .error {
   color: var(--color-error, #dc2626);
   font-size: var(--text-sm, 13px);
-  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  padding: 10px 14px;
   background: var(--color-error-bg, #fef2f2);
-  border-radius: var(--radius-sm, 6px);
-  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid rgba(220, 38, 38, 0.15);
 }
 
 .card {
   background: var(--color-surface, #ffffff);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg, 8px);
   padding: var(--spacing-lg, 24px);
-  border: 1px solid var(--color-border, #e1e4e8);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--color-border, #d1d5db);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md, 16px);
@@ -180,9 +180,9 @@ onMounted(async () => {
 
 .card h2 {
   margin: 0;
-  font-size: var(--text-xl, 18px);
+  font-size: var(--text-lg, 16px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .summary {
@@ -191,16 +191,16 @@ onMounted(async () => {
 
 .summary h3 {
   margin: 0 0 var(--spacing-sm, 8px);
-  font-size: var(--text-md, 15px);
+  font-size: var(--text-base, 14px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .summary p {
   margin: 0;
-  line-height: var(--leading-relaxed, 1.75);
-  color: var(--color-text-secondary, #57606a);
-  font-size: var(--text-md, 15px);
+  line-height: var(--leading-relaxed, 1.625);
+  color: var(--color-text-secondary, #4b5563);
+  font-size: var(--text-base, 14px);
 }
 
 .data-block {
@@ -209,9 +209,9 @@ onMounted(async () => {
 
 .data-block h3 {
   margin: 0 0 var(--spacing-sm, 8px);
-  font-size: var(--text-md, 15px);
+  font-size: var(--text-base, 14px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .data-block ul {
@@ -225,9 +225,9 @@ onMounted(async () => {
 
 .data-block li {
   padding: var(--spacing-md, 16px);
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-bg, #fafbfc);
-  border: 1px solid var(--color-border-light, #eaecef);
+  border-radius: var(--radius-md, 6px);
+  background: var(--color-bg, #f5f6f7);
+  border: 1px solid var(--color-border-light, #e5e7eb);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs, 4px);
@@ -235,12 +235,12 @@ onMounted(async () => {
 }
 
 .data-block li strong {
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   font-weight: 600;
 }
 
 .data-block li span {
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
 }
 
 .data-block table {
@@ -251,19 +251,19 @@ onMounted(async () => {
 
 .data-block th,
 .data-block td {
-  border: 1px solid var(--color-border, #e1e4e8);
-  padding: 10px 12px;
+  border: 1px solid var(--color-border, #d1d5db);
+  padding: 9px 12px;
   text-align: left;
 }
 
 .data-block th {
-  background: var(--color-bg, #fafbfc);
+  background: var(--color-bg, #f5f6f7);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .data-block td {
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
 }
 
 .template-controls {
@@ -275,36 +275,36 @@ onMounted(async () => {
 
 .template-controls select {
   flex: 1;
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
-  padding: 10px 12px;
-  font-size: var(--text-md, 15px);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: 9px 12px;
+  font-size: var(--text-base, 14px);
   background: var(--color-surface, #ffffff);
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .template-controls select:focus {
   outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px var(--color-primary-light, #eff6ff);
+  border-color: var(--color-primary, #374151);
+  box-shadow: 0 0 0 2px rgba(55, 65, 81, 0.1);
 }
 
 .primary {
-  background: var(--color-primary, #2563eb);
+  background: var(--color-primary, #374151);
   color: #ffffff;
   border: none;
-  border-radius: var(--radius-md, 8px);
-  padding: 10px 18px;
+  border-radius: var(--radius-md, 6px);
+  padding: 9px 16px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--text-sm, 13px);
   transition: background-color 0.15s ease;
   white-space: nowrap;
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--color-primary-hover, #1d4ed8);
+  background: var(--color-primary-hover, #1f2937);
 }
 
 .primary:disabled {
@@ -314,11 +314,11 @@ onMounted(async () => {
 
 .ghost {
   background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
-  padding: 8px 14px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: 7px 12px;
   cursor: pointer;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   font-weight: 500;
   font-size: var(--text-sm, 13px);
   text-decoration: none;
@@ -326,20 +326,20 @@ onMounted(async () => {
 }
 
 .ghost:hover {
-  background: var(--color-bg, #fafbfc);
-  border-color: var(--color-text-muted, #8b949e);
+  background: var(--color-bg, #f5f6f7);
+  border-color: var(--color-text-muted, #6b7280);
 }
 
 .rendered {
   width: 100%;
   background: #1e293b;
   color: #e2e8f0;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md, 6px);
   padding: var(--spacing-md, 16px);
   white-space: pre-wrap;
   font-size: var(--text-sm, 13px);
-  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
-  line-height: var(--leading-relaxed, 1.75);
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', 'Consolas', monospace);
+  line-height: var(--leading-relaxed, 1.625);
   overflow-x: auto;
   border: 1px solid #334155;
 }

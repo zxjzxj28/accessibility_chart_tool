@@ -1,33 +1,37 @@
-/* 全局样式 - 论文展示优化版 */
+/* 全局样式 - 学术论文展示优化版 */
 :root {
-  /* 字体系统 - 使用专业学术风格字体 */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  /* 字体系统 - 专业学术风格 */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', monospace;
 
-  /* 颜色系统 - 简洁专业配色 */
-  --color-bg: #fafbfc;
+  /* 颜色系统 - 沉稳专业配色 */
+  --color-bg: #f5f6f7;
   --color-surface: #ffffff;
-  --color-border: #e1e4e8;
-  --color-border-light: #eaecef;
+  --color-border: #d1d5db;
+  --color-border-light: #e5e7eb;
 
   /* 文字颜色 */
-  --color-text-primary: #24292f;
-  --color-text-secondary: #57606a;
-  --color-text-muted: #8b949e;
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #6b7280;
 
-  /* 主题色 - 深蓝学术风格 */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-light: #eff6ff;
+  /* 主题色 - 深沉蓝灰 */
+  --color-primary: #374151;
+  --color-primary-hover: #1f2937;
+  --color-primary-light: #f3f4f6;
+
+  /* 强调色 - 用于链接和重要操作 */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
 
   /* 状态颜色 */
-  --color-success: #16a34a;
-  --color-success-bg: #f0fdf4;
-  --color-warning: #ca8a04;
-  --color-warning-bg: #fefce8;
+  --color-success: #059669;
+  --color-success-bg: #ecfdf5;
+  --color-warning: #d97706;
+  --color-warning-bg: #fffbeb;
   --color-error: #dc2626;
   --color-error-bg: #fef2f2;
-  --color-info: #0284c7;
+  --color-info: #0369a1;
   --color-info-bg: #f0f9ff;
 
   /* 间距系统 */
@@ -38,15 +42,15 @@
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
 
-  /* 圆角 */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* 圆角 - 更小更规整 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 
-  /* 阴影 - 更柔和 */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  /* 阴影 - 更细腻 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
 
   /* 字号系统 */
   --text-xs: 12px;
@@ -56,13 +60,13 @@
   --text-lg: 16px;
   --text-xl: 18px;
   --text-2xl: 20px;
-  --text-3xl: 24px;
-  --text-4xl: 28px;
+  --text-3xl: 22px;
+  --text-4xl: 26px;
 
   /* 行高 */
   --leading-tight: 1.25;
   --leading-normal: 1.5;
-  --leading-relaxed: 1.75;
+  --leading-relaxed: 1.625;
 
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -83,13 +87,13 @@ body {
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--color-accent);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 a:hover {
-  color: var(--color-primary-hover);
+  color: var(--color-accent-hover);
 }
 
 button {
@@ -103,8 +107,8 @@ input, select, textarea {
 
 /* 滚动条美化 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -113,7 +117,7 @@ input, select, textarea {
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {

@@ -590,12 +590,12 @@ onMounted(async () => {
 /* 仪表盘布局 */
 .dashboard {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 240px 1fr;
   gap: var(--spacing-lg, 24px);
   padding: var(--spacing-xl, 32px);
   min-height: 100vh;
-  background: var(--color-bg, #fafbfc);
-  max-width: 1280px;
+  background: var(--color-bg, #f5f6f7);
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -615,27 +615,23 @@ onMounted(async () => {
 .sidebar-hint,
 .card {
   background: var(--color-surface, #ffffff);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg, 8px);
   padding: var(--spacing-lg, 24px);
-  border: 1px solid var(--color-border, #e1e4e8);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--color-border, #d1d5db);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
 }
 
 /* 用户卡片 */
-.user-card {
-  background: var(--color-surface, #ffffff);
-}
-
 .user-card h2 {
   margin: 0 0 var(--spacing-xs, 4px);
-  font-size: var(--text-xl, 18px);
+  font-size: var(--text-lg, 16px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 /* 次要文字 */
 .muted {
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
   margin: var(--spacing-xs, 4px) 0 var(--spacing-md, 16px);
   font-size: var(--text-sm, 13px);
   line-height: var(--leading-normal, 1.5);
@@ -643,7 +639,7 @@ onMounted(async () => {
 
 /* 链接按钮 */
 .link {
-  color: var(--color-primary, #2563eb);
+  color: var(--color-accent, #2563eb);
   background: none;
   border: none;
   padding: 0;
@@ -654,25 +650,25 @@ onMounted(async () => {
 }
 
 .link:hover {
-  color: var(--color-primary-hover, #1d4ed8);
+  color: var(--color-accent-hover, #1d4ed8);
   text-decoration: underline;
 }
 
 /* 主按钮 */
 .primary {
-  background: var(--color-primary, #2563eb);
+  background: var(--color-primary, #374151);
   color: #ffffff;
   border: none;
-  border-radius: var(--radius-md, 8px);
-  padding: 10px 18px;
+  border-radius: var(--radius-md, 6px);
+  padding: 9px 16px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--text-sm, 13px);
   transition: background-color 0.15s ease;
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--color-primary-hover, #1d4ed8);
+  background: var(--color-primary-hover, #1f2937);
 }
 
 .primary:disabled {
@@ -683,19 +679,19 @@ onMounted(async () => {
 /* 幽灵按钮 */
 .ghost {
   background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
-  padding: 8px 14px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: 7px 12px;
   cursor: pointer;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   font-weight: 500;
   font-size: var(--text-sm, 13px);
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .ghost:hover:not(:disabled) {
-  background: var(--color-bg, #fafbfc);
-  border-color: var(--color-text-muted, #8b949e);
+  background: var(--color-bg, #f5f6f7);
+  border-color: var(--color-text-muted, #6b7280);
 }
 
 .ghost:disabled {
@@ -710,9 +706,9 @@ onMounted(async () => {
   gap: var(--spacing-sm, 8px);
   margin: var(--spacing-md, 16px) 0;
   padding: var(--spacing-md, 16px);
-  background: var(--color-bg, #fafbfc);
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border, #e1e4e8);
+  background: var(--color-bg, #f5f6f7);
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--color-border-light, #e5e7eb);
 }
 
 /* 表单输入框 */
@@ -724,12 +720,12 @@ onMounted(async () => {
 .dialog input,
 .dialog select {
   width: 100%;
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
-  padding: 10px 12px;
-  font-size: var(--text-md, 15px);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: 9px 12px;
+  font-size: var(--text-base, 14px);
   background: var(--color-surface, #ffffff);
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -741,15 +737,15 @@ onMounted(async () => {
 .dialog input:focus,
 .dialog select:focus {
   outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px var(--color-primary-light, #eff6ff);
+  border-color: var(--color-primary, #374151);
+  box-shadow: 0 0 0 2px rgba(55, 65, 81, 0.1);
 }
 
 /* 侧边导航 */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm, 8px);
+  gap: var(--spacing-xs, 4px);
   padding: var(--spacing-sm, 8px);
 }
 
@@ -757,9 +753,9 @@ onMounted(async () => {
   width: 100%;
   border: none;
   background: transparent;
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
   padding: 10px 14px;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md, 6px);
   font-weight: 500;
   font-size: var(--text-sm, 13px);
   cursor: pointer;
@@ -768,29 +764,29 @@ onMounted(async () => {
 }
 
 .nav-item.active {
-  background: var(--color-primary-light, #eff6ff);
-  color: var(--color-primary, #2563eb);
+  background: var(--color-primary-light, #f3f4f6);
+  color: var(--color-primary, #374151);
   font-weight: 600;
 }
 
 .nav-item:not(.active):hover {
-  background: var(--color-bg, #fafbfc);
-  color: var(--color-text-primary, #24292f);
+  background: var(--color-bg, #f5f6f7);
+  color: var(--color-text-primary, #1f2937);
 }
 
 /* 侧边栏提示 */
 .sidebar-hint h3 {
   margin: 0 0 var(--spacing-sm, 8px);
-  font-size: var(--text-md, 15px);
+  font-size: var(--text-base, 14px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .hint {
-  color: var(--color-text-muted, #8b949e);
+  color: var(--color-text-muted, #6b7280);
   font-size: var(--text-xs, 12px);
   margin-top: var(--spacing-sm, 8px);
-  line-height: var(--leading-relaxed, 1.75);
+  line-height: var(--leading-relaxed, 1.625);
 }
 
 /* 主内容区 */
@@ -798,7 +794,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg, 24px);
-  max-width: 900px;
+  max-width: 860px;
   width: 100%;
 }
 
@@ -813,10 +809,18 @@ onMounted(async () => {
 
 .content-header h1 {
   margin: 0;
-  font-size: var(--text-3xl, 24px);
+  font-size: var(--text-2xl, 20px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
-  letter-spacing: -0.02em;
+  color: var(--color-text-primary, #1f2937);
+  letter-spacing: -0.01em;
+}
+
+/* 卡片标题 */
+.card h2 {
+  margin: 0 0 var(--spacing-md, 16px);
+  font-size: var(--text-lg, 16px);
+  font-weight: 600;
+  color: var(--color-text-primary, #1f2937);
 }
 
 /* 上传表单 */
@@ -829,22 +833,22 @@ onMounted(async () => {
 .upload-form label {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm, 8px);
+  gap: 6px;
   font-size: var(--text-sm, 13px);
   font-weight: 500;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .upload-form textarea {
   width: 100%;
-  min-height: 100px;
-  border: 1px solid var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
-  padding: 12px 14px;
-  font-size: var(--text-md, 15px);
+  min-height: 90px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: 10px 12px;
+  font-size: var(--text-base, 14px);
   resize: vertical;
   background: var(--color-surface, #ffffff);
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   font-family: inherit;
   line-height: var(--leading-normal, 1.5);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -852,8 +856,8 @@ onMounted(async () => {
 
 .upload-form textarea:focus {
   outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px var(--color-primary-light, #eff6ff);
+  border-color: var(--color-primary, #374151);
+  box-shadow: 0 0 0 2px rgba(55, 65, 81, 0.1);
 }
 
 /* 文件输入 */
@@ -861,22 +865,22 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed var(--color-border, #e1e4e8);
-  border-radius: var(--radius-md, 8px);
+  border: 1px dashed var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
   padding: var(--spacing-lg, 24px);
   text-align: center;
   cursor: pointer;
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
   font-weight: 500;
   font-size: var(--text-sm, 13px);
-  background: var(--color-bg, #fafbfc);
+  background: var(--color-bg, #f5f6f7);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .file-input:hover {
-  border-color: var(--color-primary, #2563eb);
-  background: var(--color-primary-light, #eff6ff);
-  color: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, #374151);
+  background: var(--color-primary-light, #f3f4f6);
+  color: var(--color-primary, #374151);
 }
 
 .file-input input {
@@ -890,7 +894,7 @@ onMounted(async () => {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--spacing-md, 16px);
   align-items: end;
 }
@@ -898,10 +902,10 @@ onMounted(async () => {
 .filter-grid label {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm, 8px);
+  gap: 6px;
   font-size: var(--text-sm, 13px);
   font-weight: 500;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .filter-actions {
@@ -915,21 +919,21 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-sm, 8px);
+  gap: var(--spacing-xs, 4px);
   margin-bottom: var(--spacing-md, 16px);
-  padding: 4px;
-  background: var(--color-bg, #fafbfc);
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border, #e1e4e8);
+  padding: 3px;
+  background: var(--color-bg, #f5f6f7);
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--color-border-light, #e5e7eb);
   width: fit-content;
 }
 
 .mode-tab {
   border: none;
   background: transparent;
-  color: var(--color-text-secondary, #57606a);
-  padding: 8px 14px;
-  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-secondary, #4b5563);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm, 4px);
   cursor: pointer;
   font-weight: 500;
   font-size: var(--text-sm, 13px);
@@ -938,13 +942,13 @@ onMounted(async () => {
 
 .mode-tab.active {
   background: var(--color-surface, #ffffff);
-  color: var(--color-primary, #2563eb);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  color: var(--color-primary, #374151);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
   font-weight: 600;
 }
 
 .mode-tab:not(.active):hover {
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .mode-tabs .link {
@@ -964,24 +968,24 @@ onMounted(async () => {
 
 .task-table th,
 .task-table td {
-  padding: 12px 14px;
+  padding: 11px 12px;
   text-align: left;
-  border-bottom: 1px solid var(--color-border-light, #eaecef);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
   vertical-align: middle;
 }
 
 .task-table thead th {
-  background: var(--color-bg, #fafbfc);
+  background: var(--color-bg, #f5f6f7);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
   font-size: var(--text-xs, 12px);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
 }
 
 .task-title {
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .title-cell {
@@ -992,29 +996,14 @@ onMounted(async () => {
 
 .title-cell .task-name {
   font-weight: 500;
-  color: var(--color-text-primary, #24292f);
-}
-
-.title-cell .preview {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md, 8px);
-  overflow: hidden;
-  flex-shrink: 0;
-  border: 1px solid var(--color-border, #e1e4e8);
-}
-
-.title-cell .preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  color: var(--color-text-primary, #1f2937);
 }
 
 /* 状态徽章 */
 .status-badge {
   display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm, 4px);
   font-size: var(--text-xs, 12px);
   font-weight: 500;
   white-space: nowrap;
@@ -1022,17 +1011,17 @@ onMounted(async () => {
 
 .status-badge.status-0 {
   background: var(--color-info-bg, #f0f9ff);
-  color: var(--color-info, #0284c7);
+  color: var(--color-info, #0369a1);
 }
 
 .status-badge.status-1 {
-  background: var(--color-warning-bg, #fefce8);
-  color: var(--color-warning, #ca8a04);
+  background: var(--color-warning-bg, #fffbeb);
+  color: var(--color-warning, #d97706);
 }
 
 .status-badge.status-2 {
-  background: var(--color-success-bg, #f0fdf4);
-  color: var(--color-success, #16a34a);
+  background: var(--color-success-bg, #ecfdf5);
+  color: var(--color-success, #059669);
 }
 
 .status-badge.status-3 {
@@ -1041,14 +1030,14 @@ onMounted(async () => {
 }
 
 .status-badge.status-4 {
-  background: var(--color-bg, #fafbfc);
-  color: var(--color-text-muted, #8b949e);
+  background: var(--color-bg, #f5f6f7);
+  color: var(--color-text-muted, #6b7280);
 }
 
 /* 摘要列 */
 .summary {
-  max-width: 220px;
-  color: var(--color-text-secondary, #57606a);
+  max-width: 200px;
+  color: var(--color-text-secondary, #4b5563);
   font-size: var(--text-sm, 13px);
   line-height: var(--leading-normal, 1.5);
   overflow: hidden;
@@ -1065,14 +1054,14 @@ onMounted(async () => {
 
 .actions .link,
 .actions .ghost {
-  padding: 6px 10px;
+  padding: 5px 8px;
   font-size: var(--text-xs, 12px);
 }
 
 /* 空状态 */
 .empty {
   text-align: center;
-  color: var(--color-text-muted, #8b949e);
+  color: var(--color-text-muted, #6b7280);
   padding: var(--spacing-xl, 32px) 0;
   font-size: var(--text-sm, 13px);
 }
@@ -1083,22 +1072,22 @@ onMounted(async () => {
   gap: var(--spacing-md, 16px);
   align-items: center;
   justify-content: center;
-  color: var(--color-text-secondary, #57606a);
+  color: var(--color-text-secondary, #4b5563);
   font-size: var(--text-sm, 13px);
   margin-top: var(--spacing-md, 16px);
   padding-top: var(--spacing-md, 16px);
-  border-top: 1px solid var(--color-border-light, #eaecef);
+  border-top: 1px solid var(--color-border-light, #e5e7eb);
 }
 
 .pagination .ghost {
-  padding: 6px 12px;
+  padding: 5px 10px;
 }
 
 /* 对话框 */
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1108,12 +1097,12 @@ onMounted(async () => {
 
 .dialog {
   background: var(--color-surface, #ffffff);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg, 8px);
   padding: var(--spacing-lg, 24px);
   width: 100%;
-  max-width: 400px;
-  border: 1px solid var(--color-border, #e1e4e8);
-  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.1));
+  max-width: 380px;
+  border: 1px solid var(--color-border, #d1d5db);
+  box-shadow: var(--shadow-lg, 0 4px 16px rgba(0, 0, 0, 0.08));
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md, 16px);
@@ -1121,18 +1110,18 @@ onMounted(async () => {
 
 .dialog h3 {
   margin: 0;
-  font-size: var(--text-xl, 18px);
+  font-size: var(--text-lg, 16px);
   font-weight: 600;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .dialog label {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm, 8px);
+  gap: 6px;
   font-size: var(--text-sm, 13px);
   font-weight: 500;
-  color: var(--color-text-primary, #24292f);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .dialog-actions {
@@ -1158,7 +1147,7 @@ onMounted(async () => {
   }
 
   .sidebar > * {
-    min-width: 220px;
+    min-width: 200px;
     flex-shrink: 0;
   }
 
@@ -1183,7 +1172,7 @@ onMounted(async () => {
 
   .task-table th,
   .task-table td {
-    padding: 10px 8px;
+    padding: 9px 8px;
   }
 }
 </style>
